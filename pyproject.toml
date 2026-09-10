@@ -1,0 +1,23 @@
+[project]
+name = "kimi-k3-from-scratch"
+version = "0.1.0"
+description = "A from-scratch PyTorch implementation of the Kimi K3 language backbone, derived from the papers and verified with reference tests and experiments."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.11.0",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.6",
+]
