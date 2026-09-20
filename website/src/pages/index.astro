@@ -1,0 +1,30 @@
+---
+import { getCollection, render } from "astro:content";
+import "katex/dist/katex.min.css";
+
+const docs = await getCollection("docs");
+
+const chapter = docs.find((doc) =>
+  doc.id.startsWith("01_kimi_delta_attention")
+);
+
+if (!chapter) {
+  throw new Error("KDA chapter not found");
+}
+
+const { Content } = await render(chapter);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Kimi K3 from Scratch</title>
+  </head>
+
+  <body>
+    <main>
+      <Content />
+    </main>
+  </body>
+</html>
