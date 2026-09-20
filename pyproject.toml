@@ -5,7 +5,13 @@ description = "A from-scratch PyTorch implementation of the Kimi K3 language bac
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "datasets>=4.2",
+    "huggingface-hub>=1.32.0",
+    "numpy>=2.5.3",
+    "psutil>=7.2.2",
+    "pyarrow>=25.0.1",
     "torch>=2.11.0",
+    "transformers>=5.17.0",
 ]
 
 [tool.uv.sources]

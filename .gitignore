@@ -1,0 +1,106 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ---- Environments (uv) ----
+# .python-version and uv.lock are tracked on purpose.
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# ---- Tooling caches ----
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+notebooks/**/*-checkpoint.ipynb
+
+# ---- Datasets & tokenizer artifacts ----
+data/
+datasets/
+*.arrow
+*.bin
+*.parquet
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.jsonl
+*.tfrecord
+tokenizer.json
+tokenizer.model
+*.vocab
+*.merges
+
+# ---- Model weights & checkpoints ----
+checkpoints/
+ckpt/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.gguf
+
+# ---- Experiment output & logs ----
+experiments/*/artifacts/
+experiments/*/outputs/
+runs/
+outputs/
+logs/
+*.log
+wandb/
+mlruns/
+lightning_logs/
+tensorboard/
+events.out.tfevents.*
+
+# ---- Caches from HF / torch ----
+.cache/
+.hf_cache/
+.huggingface/
+.torch/
+.triton/
+.nv/
+
+# ---- Large local assets ----
+assets/*.png
+assets/*.jpg
+assets/*.jpeg
+assets/*.gif
+assets/*.mp4
+assets/*.pdf
+
+# ---- Editors / IDE ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- OS / OneDrive ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+*.tmp
