@@ -89,6 +89,21 @@ assets/*.gif
 assets/*.mp4
 assets/*.pdf
 
+# ---- Node / JS (root package.json, website/) ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+# website/ has its own .gitignore for dist/ and .astro/
+
+# ---- Generated benchmark/result output ----
+results/
+
+# ---- Stray backups ----
+*.bak
+*.orig
+
 # ---- Editors / IDE ----
 .vscode/
 .idea/
