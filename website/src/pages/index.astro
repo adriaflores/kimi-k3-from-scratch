@@ -1,6 +1,6 @@
 ---
 import { getCollection, render } from "astro:content";
-import "katex/dist/katex.min.css";
+import ChapterLayout from "../layouts/ChapterLayout.astro";
 
 const docs = await getCollection("docs");
 
@@ -12,19 +12,45 @@ if (!chapter) {
   throw new Error("KDA chapter not found");
 }
 
-const { Content } = await render(chapter);
+const source = chapter.body;
+const firstSection = source.indexOf("\n## ");
+
+const opening = source
+  .slice(0, firstSection)
+  .trim()
+  .split(/\n\s*\n/);
+
+const rawTitle = opening[0].replace(/^#\s*/, "");
+
+const chapterNumber =
+  rawTitle.match(/^(\d+)/)?.[1] ?? "01";
+
+const title = rawTitle.replace(/^\d+\s*·\s*/, "");
+
+const draft = opening[1]
+  .replace(/\*\*/g, "")
+  .trim();
+
+const intro = opening[2].trim();
+
+const words = source
+  .replace(/```[\s\S]*?```/g, "")
+  .replace(/\$\$[\s\S]*?\$\$/g, "")
+  .split(/\s+/)
+  .length;
+
+const readingTime = Math.ceil(words / 180);
+
+const { Content, headings } = await render(chapter);
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>Kimi K3 from Scratch</title>
-  </head>
-
-  <body>
-    <main>
-      <Content />
-    </main>
-  </body>
-</html>
+<ChapterLayout
+  headings={headings}
+  chapterNumber={chapterNumber}
+  title={title}
+  intro={intro}
+  draft={draft}
+  readingTime={readingTime}
+>
+  <Content />
+</ChapterLayout>

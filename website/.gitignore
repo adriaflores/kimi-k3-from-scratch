@@ -2,6 +2,8 @@
 dist/
 # generated types
 .astro/
+# synced from ../assets by scripts/sync-assets.mjs
+public/assets/
 
 # dependencies
 node_modules/
