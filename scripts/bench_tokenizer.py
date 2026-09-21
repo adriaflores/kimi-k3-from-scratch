@@ -1,10 +1,3 @@
-"""Measure SmolLM2 tokenization density on a bounded FineWeb-Edu sample.
-
-Run: uv run python scripts/benchmark_tokenizer.py --max-documents 1000
-Primary ratios exclude appended EOS; *_with_eos includes one EOS per nonempty document.
-This is a compression sanity check, not a model-quality benchmark or a uniform sample of the whole corpus. No arbitrary pass/fail threshold is used.
-"""
-
 import argparse
 import json
 import platform
