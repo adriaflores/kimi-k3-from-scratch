@@ -34,8 +34,8 @@ coverage.xml
 notebooks/**/*-checkpoint.ipynb
 
 # ---- Datasets & tokenizer artifacts ----
-data/
-datasets/
+/data/
+/datasets/
 *.arrow
 *.bin
 *.parquet
