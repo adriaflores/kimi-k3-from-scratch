@@ -18,6 +18,7 @@ _DEFAULT_CONFIG_KWARGS = dict(
 	kda_short_conv_kernel_size=3,
 	kda_gate_lower_bound=-8.0,
 	kda_full_rank_output_gate=True,
+	kda_chunk_size=4,
 	mla_num_heads=2,
 	mla_q_lora_rank=8,
 	mla_kv_lora_rank=8,

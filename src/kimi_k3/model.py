@@ -204,6 +204,7 @@ class KimiK3Config:
 	kda_short_conv_kernel_size: int # Kernel size of the short causal convolutions applied to Q, K and V.
 	kda_gate_lower_bound: float # Lower bound applied to KDA's decay/update gate for numerical stability.
 	kda_full_rank_output_gate: bool # Whether KDA's output gate uses a full-rank projection instead of the factorized low-rank projection.
+	kda_chunk_size: int # Number of tokens per chunk in the chunkwise KDA; the sequence length must be divisible by it.
 
 	# Gated MLA
 	mla_num_heads: int # Number of Multi-Head Latent Attention heads.
