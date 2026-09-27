@@ -110,7 +110,7 @@ class KDARecurrent(nn.Module):
 
 		o = torch.stack(outputs, dim=1)  # (B, T, H, D)
 		o = o.to(out_dtype)
-		o = self.out_norm(o)            # (B, T, H, D)
+		o = self.out_norm(o) # (B, T, H, D)
 
 		if self.full_rank_output_gate:
 			g = self.Wg(x) # (B, T, KDA)  
