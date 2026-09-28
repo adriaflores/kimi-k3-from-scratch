@@ -211,7 +211,7 @@ class KimiK3Config:
 	mla_q_lora_rank: int # Rank of the low-rank query (Q) projection.
 	mla_kv_lora_rank: int # Rank of the compressed latent representation shared by K and V.
 	mla_qk_nope_head_dim: int # Per-head Q/K dimension that does not receive positional (RoPE) encoding.
-	mla_qk_shared_head_dim: int # Per-head Q/K positional dimension; corresponds to qk_rope_head_dim in the official implementation and is shared across K heads.
+	mla_qk_shared_head_dim: int # Dimension of the additional Q/K subspace whose K representation is shared across all attention heads.
 	mla_v_head_dim: int # Dimension of the value representation for each attention head.
 	mla_output_gate: bool # Whether to apply a learned sigmoid gate to MLA outputs before o_proj.
 
