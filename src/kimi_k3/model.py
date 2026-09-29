@@ -4,11 +4,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.kimi_k3.attention import KDARecurrent as KDA
+from src.kimi_k3.attention import KDAChunkwise as KDA
 from src.kimi_k3.attention import GatedMLA
 
 from src.kimi_k3.moe import StableLatentMoE
-from src.kimi_k3.ffn import DenseFFN
+from src.kimi_k3.ffn import DenseFFN, SituGLU
 
 
 def apply_attn_res(block_residual: torch.Tensor, prefix_sum: torch.Tensor, norm: nn.RMSNorm, proj: nn.Linear):
@@ -48,9 +48,10 @@ class KimiK3DecoderBlock(nn.Module):
 		else:
 			raise ValueError(f"Unknown layer type: {layer_type}")
 
-		# FFN sublayer 
+		# FFN sublayer
+		situ = SituGLU(beta=config.situ_beta, linear_beta=config.situ_linear_beta)
 		if layer_idx < config.num_dense_layers:
-			self.ffn = DenseFFN(config)
+			self.ffn = DenseFFN(hidden_size=config.hidden_size, intermediate_size=config.dense_intermediate_size, situ=situ)
 		else:
 			self.ffn = StableLatentMoE(config)
 
