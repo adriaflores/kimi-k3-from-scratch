@@ -33,6 +33,7 @@ _DEFAULT_CONFIG_KWARGS = dict(
 	latent_moe_dim=8,
 	expert_intermediate_size=16,
 	latent_moe_use_norm=True,
+	routed_scaling_factor=1.0,
 	moe_renormalize=True,
 	situ_beta=1.0,
 	situ_linear_beta=1.0,

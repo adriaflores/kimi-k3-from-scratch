@@ -49,8 +49,9 @@ class KimiK3DecoderBlock(nn.Module):
 			raise ValueError(f"Unknown layer type: {layer_type}")
 
 		# FFN sublayer
-		situ = SituGLU(beta=config.situ_beta, linear_beta=config.situ_linear_beta)
+		
 		if layer_idx < config.num_dense_layers:
+			situ = SituGLU(beta=config.situ_beta, linear_beta=config.situ_linear_beta)
 			self.ffn = DenseFFN(hidden_size=config.hidden_size, intermediate_size=config.dense_intermediate_size, situ=situ)
 		else:
 			self.ffn = StableLatentMoE(config)
@@ -226,6 +227,7 @@ class KimiK3Config:
 	latent_moe_dim: int # Dimension of the shared latent space in which routed experts operate; corresponds to routed_expert_hidden_size in the official implementation.
 	expert_intermediate_size: int # Intermediate/hidden dimension inside each expert MLP.
 	latent_moe_use_norm: bool # Whether to RMS-normalize the routed-expert output in latent space before projecting it back to hidden_size.
+	routed_scaling_factor: float # Scaling factor applied to the routed-expert output before adding it to the residual stream.
 	moe_renormalize: bool # Whether routing weights of the selected top-k experts are renormalized.
 
 	# SiTU-GLU
