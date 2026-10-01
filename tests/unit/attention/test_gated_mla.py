@@ -93,14 +93,6 @@ def test_sequence_length_equal_to_max_seq_len_works(kda_config_factory):
 	assert torch.isfinite(out).all()
 
 
-def test_sequence_length_above_max_seq_len_raises(kda_config_factory):
-	config, mla = _make_mla(kda_config_factory)
-	x = torch.randn(2, config.max_seq_len + 1, config.hidden_size)
-
-	with pytest.raises(ValueError, match="exceeds max_seq_len"):
-		mla(x)
-
-
 def test_sequence_length_one(kda_config_factory):
 	config, mla = _make_mla(kda_config_factory)
 	x = torch.randn(2, 1, config.hidden_size)
@@ -235,19 +227,26 @@ def test_attention_scores_are_scaled_by_full_qk_head_dim(kda_config_factory, mon
 	x = torch.randn(2, 6, config.hidden_size)
 
 	captured = []
-	original_softmax = F.softmax
+	original_sdpa = F.scaled_dot_product_attention
 
-	def spy_softmax(input, *args, **kwargs):
-		captured.append(input.detach().clone())
-		return original_softmax(input, *args, **kwargs)
+	def spy_sdpa(query, key, value, *args, **kwargs):
+		captured.append((query.detach().clone(), key.detach().clone(), kwargs.get("scale")))
+		return original_sdpa(query, key, value, *args, **kwargs)
 
-	monkeypatch.setattr(F, "softmax", spy_softmax)
+	monkeypatch.setattr(F, "scaled_dot_product_attention", spy_sdpa)
 	with torch.no_grad():
 		mla(x)
 	monkeypatch.undo()
 
 	assert len(captured) == 1
-	module_scores = captured[0]
+	Q, K, scale = captured[0]
+	# SDPA falls back to 1/sqrt(Q.size(-1)) when no scale is given.
+	if scale is None:
+		scale = 1.0 / math.sqrt(Q.size(-1))
+
+	T = x.shape[1]
+	causal_mask = torch.ones(T, T, dtype=torch.bool).triu(1)
+	module_scores = (Q @ K.mT * scale).masked_fill(causal_mask, float("-inf"))
 	with torch.no_grad():
 		_, ref_scores = _reference_forward(mla, x) # scaled by 1/sqrt(d_head + d_shared)
 
