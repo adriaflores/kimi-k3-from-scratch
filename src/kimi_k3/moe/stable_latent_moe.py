@@ -24,7 +24,7 @@ class QuantileBalancer(nn.Module):
 
 		thresh = top_scores.view(-1, self.top_k + 1)[:, -1].unsqueeze(-1) # (BT, 1)
 		relative_thresh = thresh - router_scores # (BT, E)
-		new_biases = torch.quantile(relative_thresh, p, dim=0, interpolation="higher") # (E) 		
+		new_biases = torch.quantile(relative_thresh, p, dim=0, interpolation="higher") # (E)
 		new_biases = new_biases - new_biases.mean()
 
 		self.biases.copy_(new_biases)
@@ -75,28 +75,27 @@ class StableLatentMoE(nn.Module):
 		shared = self.shared_experts(x) # (B, T, C)
 
 		#Routed part
-		router_logits = F.linear(x.to(torch.float32), self.router.weight.to(torch.float32), bias=None) # (B, T, E)
-		router_scores = torch.sigmoid(router_logits)
-		biases = self.quantile_balancer.get_biases() # (E)
-		corrected_scores = router_scores + biases # (B, T, E)
-		top_scores, top_indices = torch.topk(corrected_scores, k=self.top_k + 1, dim=-1) # (B, T, K + 1), (B, T, K + 1)
-
-		router_scores = router_scores.reshape(B * T, -1) # (BT, E)
-
-		if self.training: 
-			self.quantile_balancer.update(top_scores=top_scores, router_scores=router_scores)
-			
+		# Explicit .float() inputs alone do not stop autocast from lowering F.linear.
+		with torch.autocast(device_type=x.device.type, enabled=False):
+			router_logits = F.linear(x.to(torch.float32), self.router.weight.to(torch.float32), bias=None) # (B, T, E)
+			router_scores = torch.sigmoid(router_logits)
+			biases = self.quantile_balancer.get_biases() # (E)
+			corrected_scores = router_scores + biases # (B, T, E)
+			top_scores, top_indices = torch.topk(corrected_scores, k=self.top_k + 1, dim=-1) # (B, T, K + 1), (B, T, K + 1)
+			router_scores = router_scores.reshape(B * T, -1) # (BT, E)
+			if self.training:
+				self.quantile_balancer.update(top_scores=top_scores, router_scores=router_scores)
 		top_indices = top_indices[..., :-1] # (B, T, K)
 		top_indices = top_indices.reshape(B * T, -1) # (BT, K)
-		
+
 		x_flat = x.reshape(B * T, -1) # (BT, C)
 		z = self.down_latent_proj(x_flat) # (BT, D_latent)
-		
+
 		weights = torch.gather(router_scores, dim=-1, index=top_indices) # (BT, K)
 		if self.moe_renormalize:
 			weights = F.normalize(weights, p=1, dim=-1)
 
-		routed_output = x_flat.new_zeros(B*T, self.latent_moe_dim) # (B*T, D_latent)
+		routed_output = z.new_zeros(B*T, self.latent_moe_dim) # Match the autocast expert output dtype.
 
 		for expert_j in range(self.num_routed_experts):
 			mask = top_indices == expert_j # (BT, K)
@@ -121,5 +120,3 @@ class StableLatentMoE(nn.Module):
 		output = shared + routed
 
 		return output
-			
-

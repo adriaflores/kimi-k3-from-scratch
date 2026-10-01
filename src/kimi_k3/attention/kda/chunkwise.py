@@ -60,7 +60,7 @@ class KDAChunkwise(nn.Module):
 
 		q = F.silu(self.q_conv(q))  # (B, KDA, T)
 		q = q.contiguous().view(B, self.num_heads, self.d_head, T).transpose(-1, -2) # (B, H, T, D)
-		
+
 		k = F.silu(self.k_conv(k))  # (B, KDA, T)
 		k = k.contiguous().view(B, self.num_heads, self.d_head, T).transpose(-1, -2) # (B, H, T, D)
 
@@ -69,104 +69,107 @@ class KDAChunkwise(nn.Module):
 
 		out_dtype = v.dtype
 
-		q, k, v = map(lambda x: x.to(torch.float), [q, k, v])
+		# Keep the WY solve and recurrent state in FP32 under mixed precision.
+		with torch.autocast(device_type=x.device.type, enabled=False):
+			q, k, v = map(lambda x: x.to(torch.float), [q, k, v])
 
-		q = F.normalize(q, p=2, dim=-1, eps=self.eps)  # (B, H, T, D)
-		k = F.normalize(k, p=2, dim=-1, eps=self.eps)  # (B, H, T, D)
+			q = F.normalize(q, p=2, dim=-1, eps=self.eps)  # (B, H, T, D)
+			k = F.normalize(k, p=2, dim=-1, eps=self.eps)  # (B, H, T, D)
 
-		beta = torch.sigmoid(self.Wb(x).float()) # (B, T, H)
-		beta = beta.transpose(1,2).unsqueeze(-1)  # (B, H, T, 1)
+			beta = torch.sigmoid(self.Wb(x.to(self.Wb.weight.dtype)).float()) # (B, T, H)
+			beta = beta.transpose(1,2).unsqueeze(-1)  # (B, H, T, 1)
 
-		a = self.Wau(self.Wad(x)).float() # (B, T, H*D)
+			a = self.Wau(self.Wad(x.to(self.Wad.weight.dtype))).float() # (B, T, H*D)
 
-		dt = a + self.dt_bias # (B, T, H*D)
-		dt = dt.view(B, T, self.num_heads, self.d_head) # (B, T, H, D)
+			dt = a + self.dt_bias # (B, T, H*D)
+			dt = dt.view(B, T, self.num_heads, self.d_head) # (B, T, H, D)
 
-		A = torch.exp(self.A_log)  # (H)
-		A = A.view(1, 1, self.num_heads, 1) # (1, 1, H, 1)
+			A = torch.exp(self.A_log)  # (H)
+			A = A.view(1, 1, self.num_heads, 1) # (1, 1, H, 1)
 
-		log_alpha = (self.gate_lower_bound * torch.sigmoid(A * dt)) # (B, T, H, D), we want to store it in log space to avoid numerical issues
-		log_alpha = log_alpha.transpose(1, 2) # (B, H, T, D)
+			log_alpha = (self.gate_lower_bound * torch.sigmoid(A * dt)) # (B, T, H, D), we want to store it in log space to avoid numerical issues
+			log_alpha = log_alpha.transpose(1, 2) # (B, H, T, D)
 
-		assert T % self.chunk_size == 0, f"Sequence length {T} must be divisible by chunk_size={self.chunk_size}"
+			assert T % self.chunk_size == 0, f"Sequence length {T} must be divisible by chunk_size={self.chunk_size}"
 
-		num_chunks = T // self.chunk_size
-		q = q.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, self.d_head) # (B, H, N, C, D)
-		k = k.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, self.d_head) # (B, H, N, C, D)
-		v = v.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, self.d_head) # (B, H, N, C, D)
-		log_alpha = log_alpha.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, self.d_head) # (B, H, N, C, D)
-		beta = beta.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, 1) # (B, H, N, C, 1)
+			num_chunks = T // self.chunk_size
+			q = q.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, self.d_head) # (B, H, N, C, D)
+			k = k.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, self.d_head) # (B, H, N, C, D)
+			v = v.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, self.d_head) # (B, H, N, C, D)
+			log_alpha = log_alpha.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, self.d_head) # (B, H, N, C, D)
+			beta = beta.contiguous().view(B, self.num_heads, num_chunks, self.chunk_size, 1) # (B, H, N, C, 1)
 
-		log_gamma = log_alpha.cumsum(dim=-2)
+			log_gamma = log_alpha.cumsum(dim=-2)
 
-		A = k.new_zeros(B, self.num_heads, num_chunks, self.chunk_size, self.chunk_size)
-		beta = beta.squeeze(-1) # (B, H, N, C)
-
-		for j in range(self.chunk_size):
-			k_j = k[:, :, :, j, :].unsqueeze(-2) # (B, H, N, 1, D)
-			g_j = log_gamma[:, :, : ,j, :].unsqueeze(-2) # (B, H, N, 1, D)
-			g_future = log_gamma[..., j+1:, :] # (B, H, N, C-j-1, D)
-			k_future = k[..., j+1:, :] # (B, H, N, C-j-1, D)
-			beta_future = beta[..., j+1:] # (B, H, N, C-j-1)
-			log_delta_gamma = g_future - g_j # (B, H, N, C-j-1, D)
-			coeff = (k_future * torch.exp(log_delta_gamma) * k_j).sum(-1) # (B, H, N, C-j-1)
-			coeff = -beta_future * coeff
-			A[..., j+1:, j] = coeff
-
-		I = torch.eye(self.chunk_size, device=A.device, dtype=A.dtype)
-		T_ut = torch.linalg.solve_triangular(I - A, I, upper=False) # (B, H, N, C, C)
-		L = torch.exp(log_gamma) * k # (B, H, N, C, D)
-		beta_scalar = beta.unsqueeze(-2) # (B, H, N, 1, C)
-		
-		T_b = T_ut * beta_scalar
-		R = T_b @ L # (B, H, N, C, D)
-		U = T_b @ v # (B, H, N, C, D)
-
-		S = k.new_zeros(B, self.num_heads, self.d_head, self.d_head)
-
-		outputs = []
-
-		for chunk in range(num_chunks):
-			U_n = U[:, :, chunk, :, :] # (B, H, C, D)
-			R_n = R[:, :, chunk, :, :] # (B, H, C, D)
-			Z = U_n - R_n @ S
-			q_n = q[:, :, chunk, :, :] # (B, H, C, D)
-			log_gamma_n = log_gamma[:, :, chunk, :, :] # (B, H, C, D)
-			Q_n = torch.exp(log_gamma_n) * q_n
-
-			Aqk = k.new_zeros(B, self.num_heads, self.chunk_size, self.chunk_size)
+			A = k.new_zeros(B, self.num_heads, num_chunks, self.chunk_size, self.chunk_size)
+			beta = beta.squeeze(-1) # (B, H, N, C)
 
 			for j in range(self.chunk_size):
-				k_j = k[:, :, chunk, j, :].unsqueeze(-2) # (B, H, 1, D)
-				g_j = log_gamma[:, :, chunk ,j, :].unsqueeze(-2) # (B, H, 1, D)
-				g_future = log_gamma[:, :, chunk, j:, :] # (B, H, C-j, D)
-				log_delta_gamma = g_future - g_j # (B, H, C-j, D)
-				q_t = q[:, : ,chunk, j:, :]
-				coeff = (q_t * torch.exp(log_delta_gamma) * k_j).sum(-1) # (B, H, C-j)
-				Aqk[..., j:, j] = coeff
+				k_j = k[:, :, :, j, :].unsqueeze(-2) # (B, H, N, 1, D)
+				g_j = log_gamma[:, :, : ,j, :].unsqueeze(-2) # (B, H, N, 1, D)
+				g_future = log_gamma[..., j+1:, :] # (B, H, N, C-j-1, D)
+				k_future = k[..., j+1:, :] # (B, H, N, C-j-1, D)
+				beta_future = beta[..., j+1:] # (B, H, N, C-j-1)
+				log_delta_gamma = g_future - g_j # (B, H, N, C-j-1, D)
+				coeff = (k_future * torch.exp(log_delta_gamma) * k_j).sum(-1) # (B, H, N, C-j-1)
+				coeff = -beta_future * coeff
+				A[..., j+1:, j] = coeff
 
-			log_gamma_c = log_gamma[:, : , chunk, self.chunk_size-1, :]# (B, H, D)
-			S_decay = torch.exp(log_gamma_c.unsqueeze(-1)) * S
-			g_j = log_gamma[:, :, chunk , :, :] # (B, H, C, D)
-			K_decay = torch.exp(log_gamma_c.unsqueeze(-2) - g_j) * k[:, :, chunk, :, :] # (B, H, C, D)
-			S_new = S_decay + K_decay.mT @ Z
-			O_n = self.scale * (Q_n @ S + Aqk @ Z) # (B, H, C, D)
-			outputs.append(O_n)
-			S = S_new
+			I = torch.eye(self.chunk_size, device=A.device, dtype=A.dtype)
+			T_ut = torch.linalg.solve_triangular(I - A, I, upper=False) # (B, H, N, C, C)
+			L = torch.exp(log_gamma) * k # (B, H, N, C, D)
+			beta_scalar = beta.unsqueeze(-2) # (B, H, N, 1, C)
 
-		o = torch.cat(outputs, dim=2) # (B, H, T, D)
-		o = o.transpose(1, 2)  # (B, T, H, D)
+			T_b = T_ut * beta_scalar
+			R = T_b @ L # (B, H, N, C, D)
+			U = T_b @ v # (B, H, N, C, D)
+
+			S = k.new_zeros(B, self.num_heads, self.d_head, self.d_head)
+
+			outputs = []
+
+			for chunk in range(num_chunks):
+				U_n = U[:, :, chunk, :, :] # (B, H, C, D)
+				R_n = R[:, :, chunk, :, :] # (B, H, C, D)
+				Z = U_n - R_n @ S
+				q_n = q[:, :, chunk, :, :] # (B, H, C, D)
+				log_gamma_n = log_gamma[:, :, chunk, :, :] # (B, H, C, D)
+				Q_n = torch.exp(log_gamma_n) * q_n
+
+				Aqk = k.new_zeros(B, self.num_heads, self.chunk_size, self.chunk_size)
+
+				for j in range(self.chunk_size):
+					k_j = k[:, :, chunk, j, :].unsqueeze(-2) # (B, H, 1, D)
+					g_j = log_gamma[:, :, chunk ,j, :].unsqueeze(-2) # (B, H, 1, D)
+					g_future = log_gamma[:, :, chunk, j:, :] # (B, H, C-j, D)
+					log_delta_gamma = g_future - g_j # (B, H, C-j, D)
+					q_t = q[:, : ,chunk, j:, :]
+					coeff = (q_t * torch.exp(log_delta_gamma) * k_j).sum(-1) # (B, H, C-j)
+					Aqk[..., j:, j] = coeff
+
+				log_gamma_c = log_gamma[:, : , chunk, self.chunk_size-1, :]# (B, H, D)
+				S_decay = torch.exp(log_gamma_c.unsqueeze(-1)) * S
+				g_j = log_gamma[:, :, chunk , :, :] # (B, H, C, D)
+				K_decay = torch.exp(log_gamma_c.unsqueeze(-2) - g_j) * k[:, :, chunk, :, :] # (B, H, C, D)
+				S_new = S_decay + K_decay.mT @ Z
+				O_n = self.scale * (Q_n @ S + Aqk @ Z) # (B, H, C, D)
+				outputs.append(O_n)
+				S = S_new
+
+			o = torch.cat(outputs, dim=2) # (B, H, T, D)
+			o = o.transpose(1, 2)  # (B, T, H, D)
+
 		o = o.to(out_dtype)
 		o = self.out_norm(o) # (B, T, H, D)
 
 		if self.full_rank_output_gate:
-			g = self.Wg(x) # (B, T, KDA)  
+			g = self.Wg(x) # (B, T, KDA)
 		else:
-			g = self.Wgu(self.Wgd(x)) # (B, T, KDA) 
-		g = torch.sigmoid(g)       
+			g = self.Wgu(self.Wgd(x)) # (B, T, KDA)
+		g = torch.sigmoid(g)
 		g = g.view(B, T, self.num_heads, self.d_head) # (B, T, H, D)
 
-		o = o * g                      
+		o = o * g
 		o = o.contiguous().view(B,T, self.kda_dim)
 		x_new = self.Wo(o)
 
