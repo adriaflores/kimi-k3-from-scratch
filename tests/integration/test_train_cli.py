@@ -44,12 +44,14 @@ def prepared_data(tmp_path):
 @pytest.mark.parametrize("smoke_test", [False, True], ids=["kimi_k3_yaml", "legacy_smoke_test"])
 def test_cli_trains_and_saves_selected_model(prepared_data, tmp_path, smoke_test):
 	checkpoint = tmp_path / "last.pt"
+	run_dir = tmp_path / "run"
+	output_args = ["--run-dir", str(run_dir), "--checkpoint", str(checkpoint)] if smoke_test else []
 	selection = ["--smoke-test"] if smoke_test else ["--model-config", str(MODEL_CONFIG)]
 	result = subprocess.run(
 		[sys.executable, str(TRAIN_SCRIPT), "--data-dir", str(prepared_data),
 		 *selection, "--device", "cpu", "--batch-size", "1", "--seq-len", "8",
 		 "--max-steps", "2", "--log-interval", "1", "--eval-batches", "1",
-		 "--seed", "123", "--checkpoint", str(checkpoint)],
+		 "--seed", "123", *output_args],
 		# Exercise direct script imports outside the repository root too.
 		cwd=tmp_path, env={**os.environ, "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"},
 		capture_output=True, text=True, timeout=60, check=False,
@@ -57,10 +59,22 @@ def test_cli_trains_and_saves_selected_model(prepared_data, tmp_path, smoke_test
 	assert result.returncode == 0, result.stdout + result.stderr
 	assert "step 2 | train loss" in result.stdout
 	assert "step 2 | val loss" in result.stdout
+	if not smoke_test:
+		run_dirs = list((tmp_path / "results/training/runs").iterdir())
+		assert len(run_dirs) == 1
+		run_dir = run_dirs[0]
+		checkpoint = run_dir / "last.pt"
+	manifest = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+	session = manifest["sessions"][0]
+	assert session["train_config"]["seed"] == 123
+	assert session["train_config"]["seq_len"] == 8
+	assert session["checkpoint_path"] == str(checkpoint)
+	assert len(session["git"]["commit"]) == 40
 	saved = torch.load(checkpoint, map_location="cpu", weights_only=True)
 	assert saved["step"] == 2
 	assert saved["tokens_seen"] == 16
 	assert saved["optimizer"]["state"]
+	assert session["model_config"] == json.loads(json.dumps(saved["model_config"]))
 	assert all(torch.isfinite(weight).all() for weight in saved["model"].values())
 	if smoke_test:
 		assert saved["model_config"]["model_type"] == "smoke_test_lm"

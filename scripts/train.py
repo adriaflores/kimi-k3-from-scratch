@@ -16,6 +16,7 @@ from torch.nn import functional as F
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
 from src.kimi_k3.model import KimiK3, KimiK3Config
+from src.kimi_k3.training.run import start_run
 from src.kimi_k3.training.trainer import (
 	TrainConfig,
 	TrainState,
@@ -76,7 +77,8 @@ def parse_args(argv=None):
 		parser.add_argument("--" + name.replace("_", "-"), type=float)
 	parser.add_argument("--precision", choices=("fp32", "bf16", "fp16"))
 	parser.add_argument("--lr-schedule", choices=("constant", "cosine"))
-	parser.add_argument("--checkpoint", type=Path, default=Path("results/training/last.pt"))
+	parser.add_argument("--run-dir", type=Path, help="Run folder; defaults to a unique folder under results/training/runs")
+	parser.add_argument("--checkpoint", type=Path, help="Checkpoint output; defaults to last.pt in the run folder")
 	parser.add_argument("--resume", type=Path)
 	parser.add_argument("--overfit-batch", action=argparse.BooleanOptionalAction, default=None,
 						help="Repeat one fixed training batch")
@@ -131,6 +133,14 @@ def main():
 		print(f"Resumed step {state.step}; tokens_seen={state.tokens_seen:,}; "
 			  f"base LR={config.learning_rate:g}; saved LR={optimizer.param_groups[0]['lr']:g}. "
 			  f"Data cursor={train_loader.position:,}; RNG restored.")
+	run = start_run(
+		model=model, optimizer=optimizer, config=config, state=state,
+		train_loader=train_loader, val_loader=val_loader,
+		repo_root=Path(__file__).resolve().parents[1], run_dir=args.run_dir,
+		resume_path=args.resume, checkpoint_path=args.checkpoint,
+	)
+	print(f"Run: {run.directory} | session: {run.session_id}")
+	print(f"Manifest: {run.directory / 'run.json'} | checkpoint: {run.checkpoint_path}")
 	print(f"Device: {device} | parameters: {sum(p.numel() for p in model.parameters()):,}")
 	tokens_per_update = config.batch_size * config.seq_len * config.gradient_accumulation_steps
 	print(f"AdamW betas=({config.adam_beta1}, {config.adam_beta2}) | eps={config.adam_eps:g}"
@@ -147,7 +157,7 @@ def main():
 	else:
 		print(f"KimiK3 | model config: {args.model_config}")
 	train(model, optimizer, train_loader, val_loader, config, device,
-		  state=state, checkpoint_path=args.checkpoint)
+		  state=state, checkpoint_path=run.checkpoint_path)
 
 
 if __name__ == "__main__":

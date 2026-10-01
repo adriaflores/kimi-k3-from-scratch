@@ -55,6 +55,48 @@ YAMLs remain reserved for later runtime work; select the device with `--device`.
 Use `--overfit-batch` to repeat the first training batch. Quantile Balancing
 updates only in training mode; validation preserves the training RNG state.
 
+### Run identity and provenance
+
+Every CLI invocation records its effective settings in `run.json` before
+training starts. Fresh runs default to unique folders under
+`results/training/runs/`, with `last.pt` as their checkpoint. Use `--run-dir`
+to choose a new folder; existing run folders are only accepted for resume.
+An explicit `--checkpoint` still selects an alternative output path.
+
+The manifest records model/training configurations, seed, actual AdamW group
+settings, parameter count, Git commit and dirty status, Python/NumPy/PyTorch
+and CUDA/cuDNN versions, hardware and execution settings, and data manifest
+hashes plus dataset/tokenizer revisions when present in the data metadata.
+Git fields are `null` when unavailable; a dirty flag does not preserve the
+uncommitted diff. Archive or commit local code changes for reproducible runs.
+
+```bash
+uv run python scripts/train.py --data-dir /path/to/fineweb_edu_6b \
+  --model-config configs/model/kimi_k3_tiny.yaml \
+  --training-config configs/training/smoke.yaml --device cpu \
+  --run-dir results/training/my_smoke
+
+uv run python scripts/train.py --data-dir /path/to/fineweb_edu_6b \
+  --model-config configs/model/kimi_k3_tiny.yaml \
+  --training-config configs/training/smoke.yaml --device cpu --max-steps 40 \
+  --resume results/training/my_smoke/last.pt
+```
+
+Resume reuses the manifest beside its checkpoint, or the folder explicitly
+selected with `--run-dir`. It preserves the run ID and prior sessions and
+atomically appends a new session AFTER checkpoint restoration, including the
+input/output checkpoint paths, starting counters/cursors and effective settings.
+The session identifies whether RNG comes from the initial seed or a checkpoint;
+on resume, the seed argument does not replace checkpoint RNG. A checkpoint
+without a discoverable manifest starts a new run linked to that checkpoint.
+When using a checkpoint outside the run folder, pass the original `--run-dir`
+to retain its identity. Existing manifests reject unrelated checkpoint paths
+or different model/data identities. Checkpoints inside the run folder also
+record a relative path, so moving the whole folder retains the run identity.
+This is CLI bookkeeping: checkpoint format
+4 and the direct Python `train` API are unchanged. Metrics and profiling will
+be added separately.
+
 ### Initial training recipe
 
 The presets use AdamW with peak LR `3e-4`, betas `(0.9, 0.95)`, epsilon `1e-8`
