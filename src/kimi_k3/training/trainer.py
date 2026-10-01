@@ -8,6 +8,7 @@ import math
 import os
 import random
 import time
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 
@@ -27,10 +28,22 @@ class TrainConfig:
 	eval_batches: int = 10
 	checkpoint_interval: int = 100
 	overfit_batch: bool = False
+	gradient_accumulation_steps: int = 1
+	precision: str = "fp32"
+	adam_beta1: float = 0.9
+	adam_beta2: float = 0.95
+	adam_eps: float = 1e-8
+	lr_schedule: str = "constant"
+	warmup_steps: int = 0
+	decay_steps: int = 1000
+	min_lr_ratio: float = 0.1
+	max_grad_norm: float = 0.0
+	seed: int = 1337
 
 	def __post_init__(self):
 		for name in ("batch_size", "seq_len", "max_steps", "log_interval",
-					 "eval_interval", "eval_batches", "checkpoint_interval"):
+					 "eval_interval", "eval_batches", "checkpoint_interval",
+					 "gradient_accumulation_steps", "decay_steps"):
 			value = getattr(self, name)
 			if isinstance(value, bool) or not isinstance(value, int) or value < 1:
 				raise ValueError(f"{name} must be a positive integer")
@@ -40,6 +53,26 @@ class TrainConfig:
 			raise ValueError("weight_decay must be finite and nonnegative")
 		if not isinstance(self.overfit_batch, bool):
 			raise TypeError("overfit_batch must be a bool")
+		if isinstance(self.warmup_steps, bool) or not isinstance(self.warmup_steps, int) or self.warmup_steps < 0:
+			raise ValueError("warmup_steps must be a nonnegative integer")
+		if isinstance(self.seed, bool) or not isinstance(self.seed, int) or not 0 <= self.seed < 2**32:
+			raise ValueError("seed must be an integer in [0, 2**32)")
+		if self.precision not in ("fp32", "bf16", "fp16"):
+			raise ValueError("precision must be fp32, bf16 or fp16")
+		if self.lr_schedule not in ("constant", "cosine"):
+			raise ValueError("lr_schedule must be constant or cosine")
+		if self.lr_schedule == "cosine" and self.decay_steps <= max(1, self.warmup_steps):
+			raise ValueError("cosine decay_steps must exceed max(1, warmup_steps)")
+		for name in ("adam_beta1", "adam_beta2"):
+			value = getattr(self, name)
+			if not math.isfinite(value) or not 0 <= value < 1:
+				raise ValueError(f"{name} must be finite and in [0, 1)")
+		if not math.isfinite(self.adam_eps) or self.adam_eps <= 0:
+			raise ValueError("adam_eps must be finite and positive")
+		if not math.isfinite(self.min_lr_ratio) or not 0 <= self.min_lr_ratio <= 1:
+			raise ValueError("min_lr_ratio must be finite and in [0, 1]")
+		if not math.isfinite(self.max_grad_norm) or self.max_grad_norm < 0:
+			raise ValueError("max_grad_norm must be finite and nonnegative (0 disables clipping)")
 
 
 @dataclass
@@ -47,9 +80,11 @@ class TrainState:
 	step: int = 0
 	tokens_seen: int = 0
 	overfit_batch_start: int | None = None
+	skipped_updates: int = 0
+	grad_scaler_state: dict | None = None
 
 	def __post_init__(self):
-		for name in ("step", "tokens_seen"):
+		for name in ("step", "tokens_seen", "skipped_updates"):
 			value = getattr(self, name)
 			if isinstance(value, bool) or not isinstance(value, int) or value < 0:
 				raise ValueError(f"{name} must be a nonnegative integer")
@@ -57,6 +92,59 @@ class TrainState:
 			value = self.overfit_batch_start
 			if isinstance(value, bool) or not isinstance(value, int) or value < 0:
 				raise ValueError("overfit_batch_start must be a nonnegative integer or None")
+		if self.grad_scaler_state is not None and not isinstance(self.grad_scaler_state, dict):
+			raise TypeError("grad_scaler_state must be a dict or None")
+
+
+def build_optimizer(model, config: TrainConfig):
+	"""AdamW: decay matrices; exclude 1D biases, norms and gate parameters.
+
+	With zero weight decay a single group preserves the original v3 layout.
+	model.parameters() deduplicates tied embedding/head weights.
+	"""
+	parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+	groups = parameters
+	if config.weight_decay:
+		groups = [
+			{"params": [p for p in parameters if p.ndim >= 2], "weight_decay": config.weight_decay},
+			{"params": [p for p in parameters if p.ndim < 2], "weight_decay": 0.0},
+		]
+		groups = [group for group in groups if group["params"]]
+	return torch.optim.AdamW(groups, lr=config.learning_rate, weight_decay=config.weight_decay,
+							 betas=(config.adam_beta1, config.adam_beta2), eps=config.adam_eps)
+
+
+def learning_rate_at_step(config: TrainConfig, step: int) -> float:
+	"""LR for a 1-based successful update; independent of an interruption's max_steps."""
+	if step < 1:
+		raise ValueError("LR step must be positive")
+	if step <= config.warmup_steps:
+		return config.learning_rate * step / config.warmup_steps
+	if config.lr_schedule == "constant":
+		return config.learning_rate
+	start = max(1, config.warmup_steps)
+	progress = min(1.0, (step - start) / (config.decay_steps - start))
+	factor = config.min_lr_ratio + (1 - config.min_lr_ratio) * 0.5 * (1 + math.cos(math.pi * progress))
+	return config.learning_rate * factor
+
+
+def validate_precision(device, precision: str) -> None:
+	device = torch.device(device)
+	if precision not in ("fp32", "bf16", "fp16"):
+		raise ValueError("precision must be fp32, bf16 or fp16")
+	if precision == "fp16" and device.type != "cuda":
+		raise ValueError("fp16 requires CUDA; use fp32 or bf16 on CPU")
+	if precision == "bf16" and device.type == "cuda":
+		with torch.cuda.device(device):
+			if not torch.cuda.is_bf16_supported(including_emulation=False):
+				raise ValueError("This CUDA device lacks native BF16; choose fp32 or fp16")
+
+
+def _autocast(device, precision):
+	if precision == "fp32":
+		return nullcontext()
+	dtype = torch.bfloat16 if precision == "bf16" else torch.float16
+	return torch.autocast(device_type=torch.device(device).type, dtype=dtype)
 
 
 def _model_config(model):
@@ -112,10 +200,11 @@ def _runtime_signature(model) -> dict:
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, max_batches: int) -> float:
+def evaluate(model, loader, device, max_batches: int, *, precision: str = "fp32") -> float:
 	"""Mean token loss on a fixed validation prefix, without repeating data."""
 	if max_batches < 1:
 		raise ValueError("max_batches must be positive")
+	validate_precision(device, precision)
 	was_training = model.training
 	rng_state = _capture_rng_state(device)
 	model.eval()
@@ -129,7 +218,8 @@ def evaluate(model, loader, device, max_batches: int) -> float:
 			except StopIteration:
 				break
 			x, y = x.to(device), y.to(device)
-			_, loss = model(x, targets=y)
+			with _autocast(device, precision):
+				_, loss = model(x, targets=y)
 			value = loss.item()
 			if not math.isfinite(value):
 				raise FloatingPointError("Non-finite validation loss")
@@ -153,7 +243,7 @@ def save_checkpoint(path, model, optimizer, state: TrainState, config: TrainConf
 	path.parent.mkdir(parents=True, exist_ok=True)
 	temporary = path.with_name(path.name + ".tmp")
 	torch.save({
-		"format_version": 3,
+		"format_version": 4,
 		"model": model.state_dict(),
 		"optimizer": optimizer.state_dict(),
 		**asdict(state),
@@ -176,19 +266,34 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	Optimizer hyperparameters (including LR) are restored from the checkpoint.
 	RNG is restored last, after model/optimizer construction and state loading.
 	Continue on the same data, software and device with deterministic kernels
-	for bitwise equivalence. Format 2 lacks the required state and is rejected.
+	for bitwise equivalence. Version 3 supports only its original FP32 recipe.
 	"""
 	checkpoint = torch.load(path, map_location="cpu", weights_only=True)
-	if checkpoint["format_version"] != 3:
-		raise ValueError("Expected trainer checkpoint format_version=3; older checkpoints lack cursor/RNG state")
+	version = checkpoint["format_version"]
+	if version not in (3, 4):
+		raise ValueError("Expected trainer checkpoint format_version=3 or 4; older checkpoints lack cursor/RNG state")
 	state = TrainState(
 		step=checkpoint["step"], tokens_seen=checkpoint["tokens_seen"],
 		overfit_batch_start=checkpoint["overfit_batch_start"],
+		skipped_updates=checkpoint.get("skipped_updates", 0),
+		grad_scaler_state=checkpoint.get("grad_scaler_state"),
 	)
 	# Validate structure before modifying model weights or optimizer state.
-	for name in ("batch_size", "seq_len", "overfit_batch"):
-		if checkpoint["train_config"][name] != getattr(config, name):
+	saved_config = checkpoint["train_config"]
+	legacy_defaults = TrainConfig()
+	for name in ("batch_size", "seq_len", "overfit_batch", "gradient_accumulation_steps",
+				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm"):
+		saved_value = saved_config[name] if version == 4 else saved_config.get(name, getattr(legacy_defaults, name))
+		if saved_value != getattr(config, name):
 			raise ValueError(f"Incompatible {name} in checkpoint")
+	if config.lr_schedule == "cosine":
+		for name in ("decay_steps", "min_lr_ratio"):
+			if saved_config[name] != getattr(config, name):
+				raise ValueError(f"Incompatible {name} in checkpoint")
+	if config.precision == "fp16" and (state.step or state.skipped_updates) and not state.grad_scaler_state:
+		raise ValueError("FP16 checkpoint is missing GradScaler state")
+	if config.precision != "fp16" and state.grad_scaler_state is not None:
+		raise ValueError("Unexpected GradScaler state for this precision")
 	if checkpoint["vocab_size"] != vocab_size:
 		raise ValueError("Incompatible vocab_size in checkpoint")
 	if checkpoint["model_config"] != _model_config(model):
@@ -199,6 +304,12 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 		raise ValueError("Incompatible optimizer type in checkpoint")
 	if checkpoint["runtime"] != _runtime_signature(model):
 		raise ValueError("Incompatible runtime in checkpoint (version, device, dtype, threads or determinism)")
+	groups = checkpoint["optimizer"]["param_groups"]
+	if len(groups) != len(optimizer.param_groups) or any(
+		len(saved["params"]) != len(current["params"])
+		for saved, current in zip(groups, optimizer.param_groups)
+	):
+		raise ValueError("Incompatible optimizer parameter groups (v3 requires the original single group)")
 	train_position = train_loader.validate_state_dict(checkpoint["loaders"]["train"])
 	val_loader.validate_state_dict(checkpoint["loaders"]["val"])
 	if config.overfit_batch and state.step > 0 and state.overfit_batch_start is None:
@@ -212,8 +323,10 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	model.load_state_dict(checkpoint["model"])
 	optimizer.load_state_dict(checkpoint["optimizer"])
 	optimizer.zero_grad(set_to_none=True)
-	config.learning_rate = optimizer.param_groups[0]["lr"]
-	config.weight_decay = optimizer.param_groups[0]["weight_decay"]
+	config.learning_rate = saved_config["learning_rate"] if version == 4 else optimizer.param_groups[0]["lr"]
+	config.weight_decay = saved_config["weight_decay"]
+	config.adam_beta1, config.adam_beta2 = optimizer.param_groups[0]["betas"]
+	config.adam_eps = optimizer.param_groups[0]["eps"]
 	train_loader.load_state_dict(checkpoint["loaders"]["train"])
 	val_loader.load_state_dict(checkpoint["loaders"]["val"])
 	_restore_rng_state(checkpoint["rng_state"], next(model.parameters()).device)
@@ -222,18 +335,29 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 
 def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 		  device, *, state: TrainState | None = None, checkpoint_path=None) -> TrainState:
-	"""Train until max_steps total optimizer updates, including restored steps.
+	"""Train until max_steps successful optimizer updates, including restored steps.
 
 	Uses TokenDataLoader.next_batch()/reset(); the loader itself is unchanged.
 	Exhaustion restarts the training stream, dropping an incomplete tail.
 	Validation always uses its own loader and starts from offset zero.
 	In overfit mode the batch is identified by its token offset; resume rereads
 	that batch without advancing the restored loader cursor.
+	Each update averages equal-size microbatch losses. QB updates per forward,
+	so accumulation is not equivalent to concatenation for stateful MoE routing.
+	FP16 overflow skips AdamW and LR progression; consumed tokens and QB remain.
 	"""
 	state = TrainState() if state is None else state
+	# Preserve the direct API: a fresh optimizer supplies the schedule's peak LR.
+	# The CLI constructs that optimizer from TrainConfig; resume restores the peak.
+	if state.step == 0 and state.skipped_updates == 0:
+		config.learning_rate = optimizer.param_groups[0]["lr"]
+		config.__post_init__()
 	device = torch.device(device)
 	if device.type not in ("cpu", "cuda"):
 		raise ValueError("This skeleton supports CPU or one CUDA device")
+	validate_precision(device, config.precision)
+	if config.precision != "fp32" and any(p.dtype != torch.float32 for p in model.parameters()):
+		raise ValueError("Mixed precision requires FP32 model parameters; use autocast, not model.half()")
 	if train_loader is val_loader:
 		raise ValueError("Training and validation require independent loaders")
 	if state.step > config.max_steps:
@@ -254,6 +378,9 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 
 	model.train()
 	optimizer.zero_grad(set_to_none=True)
+	scaler = torch.amp.GradScaler(device.type, enabled=config.precision == "fp16")
+	if state.grad_scaler_state is not None:
+		scaler.load_state_dict(state.grad_scaler_state)
 	window_loss = 0.0
 	window_tokens = 0
 	window_steps = 0
@@ -267,37 +394,61 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 
 	synchronize()
 	started = time.perf_counter()
-	for step in range(state.step + 1, config.max_steps + 1):
-		if fixed_batch is None:
-			try:
-				batch_start = train_loader.position
-				x, y = train_loader.next_batch()
-			except StopIteration:
-				train_loader.reset()
-				batch_start = train_loader.position
-				x, y = train_loader.next_batch()
-
-			x, y = x.to(device), y.to(device)
-
-			if config.overfit_batch:
-				state.overfit_batch_start = batch_start
-				fixed_batch = (x, y)
-		else:
-			x, y = fixed_batch
-
-		_, loss = model(x, targets=y)
-		value = loss.item()
-		if not math.isfinite(value):
-			raise FloatingPointError(f"Non-finite training loss at step {step}")
-		loss.backward()
-		optimizer.step()
-		state.step = step
-		state.tokens_seen += y.numel()
+	consecutive_skips = 0
+	while state.step < config.max_steps:
+		step = state.step + 1
+		lr = learning_rate_at_step(config, step)
+		for group in optimizer.param_groups:
+			group["lr"] = lr
+		update_loss = 0.0
+		update_tokens = 0
+		for _ in range(config.gradient_accumulation_steps):
+			if fixed_batch is None:
+				try:
+					batch_start = train_loader.position
+					x, y = train_loader.next_batch()
+				except StopIteration:
+					train_loader.reset()
+					batch_start = train_loader.position
+					x, y = train_loader.next_batch()
+				x, y = x.to(device), y.to(device)
+				if config.overfit_batch:
+					state.overfit_batch_start = batch_start
+					fixed_batch = (x, y)
+			else:
+				x, y = fixed_batch
+			with _autocast(device, config.precision):
+				_, loss = model(x, targets=y)
+			value = loss.item()
+			if not math.isfinite(value):
+				raise FloatingPointError(f"Non-finite training loss at step {step}")
+			scaler.scale(loss / config.gradient_accumulation_steps).backward()
+			update_loss += value / config.gradient_accumulation_steps
+			update_tokens += y.numel()
+			state.tokens_seen += y.numel()
+		scaler.unscale_(optimizer)
+		grad_norm = torch.nn.utils.clip_grad_norm_(
+			model.parameters(), config.max_grad_norm or float("inf"),
+			error_if_nonfinite=not scaler.is_enabled(),
+		).item()
+		previous_scale = scaler.get_scale()
+		scaler.step(optimizer)
+		scaler.update()
+		state.grad_scaler_state = scaler.state_dict() if scaler.is_enabled() else None
 		optimizer.zero_grad(set_to_none=True)
-
-		window_loss += value
-		window_tokens += x.numel()
+		window_loss += update_loss
+		window_tokens += update_tokens
 		window_steps += 1
+		if scaler.get_scale() < previous_scale:
+			state.skipped_updates += 1
+			consecutive_skips += 1
+			print(f"step {step} | FP16 overflow: update skipped"
+				  f" | loss_scale {scaler.get_scale():g} | skipped {state.skipped_updates}", flush=True)
+			if consecutive_skips >= 32:
+				raise FloatingPointError("32 consecutive FP16 updates skipped; check numerics or use FP32")
+			continue
+		consecutive_skips = 0
+		state.step = step
 		final = step == config.max_steps
 		log_now = step % config.log_interval == 0 or final
 		eval_now = step % config.eval_interval == 0 or final
@@ -309,13 +460,14 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 			training_seconds += time.perf_counter() - started
 			if log_now:
 				print(f"step {step} | train loss {window_loss / window_steps:.4f}"
+					  f" | lr {lr:.6g} | grad_norm {grad_norm:.4f}"
 					  f" | tokens_seen {state.tokens_seen:,}"
 					  f" | tokens/s {window_tokens / training_seconds:,.0f}", flush=True)
 				window_loss = 0.0
 				window_tokens = window_steps = 0
 				training_seconds = 0.0
 			if eval_now:
-				val_loss = evaluate(model, val_loader, device, config.eval_batches)
+				val_loss = evaluate(model, val_loader, device, config.eval_batches, precision=config.precision)
 				print(f"step {step} | val loss {val_loss:.4f}"
 					  f" | tokens_seen {state.tokens_seen:,}", flush=True)
 			if save_now:

@@ -4,6 +4,7 @@ import argparse
 import os
 import random
 import sys
+from dataclasses import fields, replace
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +16,14 @@ from torch.nn import functional as F
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
 from src.kimi_k3.model import KimiK3, KimiK3Config
-from src.kimi_k3.training.trainer import TrainConfig, TrainState, load_checkpoint, train
+from src.kimi_k3.training.trainer import (
+	TrainConfig,
+	TrainState,
+	build_optimizer,
+	load_checkpoint,
+	train,
+	validate_precision,
+)
 from src.kimi_k3.utils import load_config
 
 
@@ -55,54 +63,55 @@ def build_model(vocab_size, seq_len, *, model_config_path=None, smoke_test=False
 	return KimiK3(config)
 
 
-def parse_args():
-	defaults = TrainConfig()
+def parse_args(argv=None):
 	parser = argparse.ArgumentParser(description=__doc__)
 	parser.add_argument("--data-dir", type=Path, required=True)
-	parser.add_argument("--batch-size", type=int, default=defaults.batch_size)
-	parser.add_argument("--seq-len", type=int, default=defaults.seq_len)
-	parser.add_argument("--learning-rate", type=float, default=defaults.learning_rate)
-	parser.add_argument("--weight-decay", type=float, default=defaults.weight_decay)
-	parser.add_argument("--max-steps", type=int, default=defaults.max_steps)
-	parser.add_argument("--log-interval", type=int, default=defaults.log_interval)
-	parser.add_argument("--eval-interval", type=int, default=defaults.eval_interval)
-	parser.add_argument("--eval-batches", type=int, default=defaults.eval_batches)
-	parser.add_argument("--checkpoint-interval", type=int, default=defaults.checkpoint_interval)
+	parser.add_argument("--training-config", type=Path, help="Complete TrainConfig YAML; CLI values override it")
+	for name in ("batch_size", "seq_len", "max_steps", "log_interval", "eval_interval",
+				 "eval_batches", "checkpoint_interval", "gradient_accumulation_steps",
+				 "warmup_steps", "decay_steps", "seed"):
+		parser.add_argument("--" + name.replace("_", "-"), type=int)
+	for name in ("learning_rate", "weight_decay", "adam_beta1", "adam_beta2", "adam_eps",
+				 "min_lr_ratio", "max_grad_norm"):
+		parser.add_argument("--" + name.replace("_", "-"), type=float)
+	parser.add_argument("--precision", choices=("fp32", "bf16", "fp16"))
+	parser.add_argument("--lr-schedule", choices=("constant", "cosine"))
 	parser.add_argument("--checkpoint", type=Path, default=Path("results/training/last.pt"))
 	parser.add_argument("--resume", type=Path)
-	parser.add_argument("--overfit-batch", action="store_true", help="Repeat one fixed training batch")
+	parser.add_argument("--overfit-batch", action=argparse.BooleanOptionalAction, default=None,
+						help="Repeat one fixed training batch")
 	parser.add_argument("--deterministic", action="store_true", help="Require deterministic PyTorch kernels")
 	parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-	parser.add_argument("--seed", type=int, default=1337)
 	model_selection = parser.add_mutually_exclusive_group(required=True)
 	model_selection.add_argument("--model-config", type=Path, help="Path to a Kimi K3 model YAML")
 	model_selection.add_argument("--smoke-test", action="store_true", help="Use a toy model, not Kimi K3")
-	return parser.parse_args()
+	return parser.parse_args(argv)
+
+
+def build_train_config(args):
+	config = load_config(args.training_config, TrainConfig) if args.training_config else TrainConfig()
+	overrides = {field.name: getattr(args, field.name) for field in fields(TrainConfig)
+				 if getattr(args, field.name, None) is not None}
+	return replace(config, **overrides)
 
 
 def main():
 	args = parse_args()
-	config = TrainConfig(
-		batch_size=args.batch_size, seq_len=args.seq_len,
-		learning_rate=args.learning_rate, weight_decay=args.weight_decay,
-		max_steps=args.max_steps, log_interval=args.log_interval,
-		eval_interval=args.eval_interval, eval_batches=args.eval_batches,
-		checkpoint_interval=args.checkpoint_interval,
-		overfit_batch=args.overfit_batch,
-	)
+	config = build_train_config(args)
 	device = torch.device(args.device)
 	if device.type not in ("cpu", "cuda"):
 		raise ValueError("Choose cpu, cuda, or cuda:<index>")
 	if device.type == "cuda" and not torch.cuda.is_available():
 		raise RuntimeError("CUDA was requested but is unavailable")
+	validate_precision(device, config.precision)
 	if args.deterministic:
 		os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 		torch.use_deterministic_algorithms(True)
 		torch.backends.cudnn.benchmark = False
 		torch.backends.cudnn.deterministic = True
-	random.seed(args.seed)
-	np.random.seed(args.seed % 2**32)
-	torch.manual_seed(args.seed)
+	random.seed(config.seed)
+	np.random.seed(config.seed)
+	torch.manual_seed(config.seed)
 	train_data = ShardedTokenDataset(args.data_dir, split="train")
 	val_data = ShardedTokenDataset(args.data_dir, split="val")
 	if train_data.vocab_size != val_data.vocab_size:
@@ -113,18 +122,26 @@ def main():
 		train_data.vocab_size, config.seq_len,
 		model_config_path=args.model_config, smoke_test=args.smoke_test,
 	).to(device)
-	optimizer = torch.optim.AdamW(
-		model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
-	)
+	optimizer = build_optimizer(model, config)
 	state = TrainState()
 	if args.resume:
 		state = load_checkpoint(args.resume, model, optimizer, config,
 								vocab_size=train_data.vocab_size,
 								train_loader=train_loader, val_loader=val_loader)
 		print(f"Resumed step {state.step}; tokens_seen={state.tokens_seen:,}; "
-			  f"optimizer LR={config.learning_rate:g}. "
+			  f"base LR={config.learning_rate:g}; saved LR={optimizer.param_groups[0]['lr']:g}. "
 			  f"Data cursor={train_loader.position:,}; RNG restored.")
 	print(f"Device: {device} | parameters: {sum(p.numel() for p in model.parameters()):,}")
+	tokens_per_update = config.batch_size * config.seq_len * config.gradient_accumulation_steps
+	print(f"AdamW betas=({config.adam_beta1}, {config.adam_beta2}) | eps={config.adam_eps:g}"
+		  f" | weight_decay={config.weight_decay:g} | precision={config.precision}")
+	print(f"microbatch={config.batch_size} x {config.seq_len}"
+		  f" | accumulation={config.gradient_accumulation_steps} | tokens/update={tokens_per_update:,}"
+		  f" | target updates={config.max_steps:,}"
+		  f" | remaining nominal tokens={(config.max_steps - state.step) * tokens_per_update:,}")
+	print(f"LR={config.learning_rate:g} | schedule={config.lr_schedule}"
+		  f" | warmup={config.warmup_steps} | decay end={config.decay_steps}"
+		  f" | min LR ratio={config.min_lr_ratio:g} | clipping={config.max_grad_norm:g}")
 	if args.smoke_test:
 		print("SMOKE TEST: toy model only; these are not Kimi K3 results.")
 	else:
