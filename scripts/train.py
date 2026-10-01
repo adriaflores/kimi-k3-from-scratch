@@ -67,6 +67,7 @@ def parse_args():
 	parser.add_argument("--checkpoint-interval", type=int, default=defaults.checkpoint_interval)
 	parser.add_argument("--checkpoint", type=Path, default=Path("results/training/last.pt"))
 	parser.add_argument("--resume", type=Path)
+	parser.add_argument("--overfit-batch", action="store_true", help="Repeat one fixed training batch")
 	parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
 	parser.add_argument("--seed", type=int, default=1337)
 	model_selection = parser.add_mutually_exclusive_group(required=True)
@@ -83,6 +84,7 @@ def main():
 		max_steps=args.max_steps, log_interval=args.log_interval,
 		eval_interval=args.eval_interval, eval_batches=args.eval_batches,
 		checkpoint_interval=args.checkpoint_interval,
+		overfit_batch=args.overfit_batch,
 	)
 	device = torch.device(args.device)
 	if device.type not in ("cpu", "cuda"):

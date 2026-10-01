@@ -23,6 +23,7 @@ class TrainConfig:
 	eval_interval: int = 100
 	eval_batches: int = 10
 	checkpoint_interval: int = 100
+	overfit_batch: bool = False
 
 	def __post_init__(self):
 		for name in ("batch_size", "seq_len", "max_steps", "log_interval",
@@ -168,15 +169,23 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 	window_tokens = 0
 	window_steps = 0
 	training_seconds = 0.0
+	fixed_batch = None
+
 	synchronize()
 	started = time.perf_counter()
 	for step in range(state.step + 1, config.max_steps + 1):
-		try:
-			x, y = train_loader.next_batch()
-		except StopIteration:
-			train_loader.reset()
-			x, y = train_loader.next_batch()
-		x, y = x.to(device), y.to(device)
+		if fixed_batch is None:
+			try:
+				x, y = train_loader.next_batch()
+			except StopIteration:
+				train_loader.reset()
+				x, y = train_loader.next_batch()
+			x, y = x.to(device), y.to(device)
+			if config.overfit_batch:
+				fixed_batch = (x,y)
+		else:
+			x, y = fixed_batch
+			 
 		_, loss = model(x, targets=y)
 		value = loss.item()
 		if not math.isfinite(value):
