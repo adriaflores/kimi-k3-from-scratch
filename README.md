@@ -52,5 +52,7 @@ fits the context limit, and that KDA sequences are divisible by the chunk size.
 Training options currently come from the CLI. The training/runtime YAMLs are
 not loaded yet; the current loop uses FP32 with one batch per optimizer update.
 Checkpoint resume restores weights and optimizer state, but restarts the data
-stream and does not restore RNG state. Quantile Balancing still updates during
-evaluation; freezing it is a separate pending change.
+stream and does not restore RNG state. Quantile Balancing biases
+update only in training mode and stay frozen during evaluation.
+`--overfit-batch` repeats the first training batch at every step, to check
+that the model can memorize it.
