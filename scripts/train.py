@@ -1,9 +1,12 @@
 """Run from the repository root: uv run python scripts/train.py --help."""
 
 import argparse
+import os
+import random
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -68,6 +71,7 @@ def parse_args():
 	parser.add_argument("--checkpoint", type=Path, default=Path("results/training/last.pt"))
 	parser.add_argument("--resume", type=Path)
 	parser.add_argument("--overfit-batch", action="store_true", help="Repeat one fixed training batch")
+	parser.add_argument("--deterministic", action="store_true", help="Require deterministic PyTorch kernels")
 	parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
 	parser.add_argument("--seed", type=int, default=1337)
 	model_selection = parser.add_mutually_exclusive_group(required=True)
@@ -91,6 +95,13 @@ def main():
 		raise ValueError("Choose cpu, cuda, or cuda:<index>")
 	if device.type == "cuda" and not torch.cuda.is_available():
 		raise RuntimeError("CUDA was requested but is unavailable")
+	if args.deterministic:
+		os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+		torch.use_deterministic_algorithms(True)
+		torch.backends.cudnn.benchmark = False
+		torch.backends.cudnn.deterministic = True
+	random.seed(args.seed)
+	np.random.seed(args.seed % 2**32)
 	torch.manual_seed(args.seed)
 	train_data = ShardedTokenDataset(args.data_dir, split="train")
 	val_data = ShardedTokenDataset(args.data_dir, split="val")
@@ -108,13 +119,11 @@ def main():
 	state = TrainState()
 	if args.resume:
 		state = load_checkpoint(args.resume, model, optimizer, config,
-								vocab_size=train_data.vocab_size)
-		# Keep saved config metadata consistent with restored optimizer settings.
-		config.learning_rate = optimizer.param_groups[0]["lr"]
-		config.weight_decay = optimizer.param_groups[0]["weight_decay"]
+								vocab_size=train_data.vocab_size,
+								train_loader=train_loader, val_loader=val_loader)
 		print(f"Resumed step {state.step}; tokens_seen={state.tokens_seen:,}; "
 			  f"optimizer LR={config.learning_rate:g}. "
-			  "Data restarts at offset 0; RNG is not restored. Resume is not exact.")
+			  f"Data cursor={train_loader.position:,}; RNG restored.")
 	print(f"Device: {device} | parameters: {sum(p.numel() for p in model.parameters()):,}")
 	if args.smoke_test:
 		print("SMOKE TEST: toy model only; these are not Kimi K3 results.")

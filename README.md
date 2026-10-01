@@ -51,8 +51,60 @@ fits the context limit, and that KDA sequences are divisible by the chunk size.
 
 Training options currently come from the CLI. The training/runtime YAMLs are
 not loaded yet; the current loop uses FP32 with one batch per optimizer update.
-Checkpoint resume restores weights and optimizer state, but restarts the data
-stream and does not restore RNG state. Quantile Balancing biases
-update only in training mode and stay frozen during evaluation.
-`--overfit-batch` repeats the first training batch at every step, to check
-that the model can memorize it.
+Use `--overfit-batch` to repeat the first training batch. Quantile Balancing
+updates only in training mode; validation preserves the training RNG state.
+
+### Checkpoints and resume
+
+Checkpoints use trainer format version 3 and are written atomically after a
+completed optimizer update, with no pending gradients. They contain model
+parameters and persistent buffers (including Quantile Balancing biases), AdamW
+state and hyperparameters, step/token counters, both data-loader cursors, and
+Python, NumPy, PyTorch CPU and active-device CUDA RNG states. In overfit mode,
+the fixed batch's starting token offset is saved so resume rereads those same
+examples without advancing the restored cursor.
+
+For a deterministic comparison, use `--deterministic` in both the initial and
+resumed runs. Resume restores RNG after rebuilding the model and optimizer;
+`--seed` does not replace the saved state. `--max-steps` is the total target
+number of updates, including the saved steps. Saved optimizer hyperparameters
+override the CLI learning rate and weight decay.
+
+```bash
+uv run python scripts/train.py --data-dir /path/to/fineweb_edu_6b \
+  --model-config configs/model/kimi_k3_tiny.yaml --device cpu \
+  --batch-size 1 --seq-len 128 --max-steps 100 --eval-batches 1 \
+  --deterministic --checkpoint results/training/resume_tiny.pt
+
+uv run python scripts/train.py --data-dir /path/to/fineweb_edu_6b \
+  --model-config configs/model/kimi_k3_tiny.yaml --device cpu \
+  --batch-size 1 --seq-len 128 --max-steps 200 --eval-batches 1 \
+  --deterministic --checkpoint results/training/resume_tiny.pt \
+  --resume results/training/resume_tiny.pt
+```
+
+Resume checks the model configuration, batch dimensions, overfit mode,
+optimizer type, data manifests and execution settings before loading state.
+Prepared shards must remain unchanged: manifest identity includes their
+recorded checksums, but startup does not hash entire shard files. The data
+directory can move if its manifest and files are identical. Format version 2
+checkpoints lack cursors/RNG and cannot provide this complete resume; keep
+existing checkpoints separate when testing the new format.
+
+Exact equivalence requires the same software, hardware and execution settings
+with deterministic kernels; PyTorch does not promise reproducibility across
+[versions or platforms](https://docs.pytorch.org/docs/stable/notes/randomness.html).
+The current trainer has no scheduler, AMP scaler, gradient accumulation,
+distributed sampler or persistent recurrent cache. Add their states to the
+checkpoint if those features are introduced.
+
+```bash
+uv run pytest -q tests/integration/test_checkpoint_resume.py
+```
+
+These tests compare continuous training with a saved/reconstructed/resumed
+run: losses, all model tensors, AdamW state, counters, cursors and subsequent
+random draws. They cover real mixed KDA/MLA/MoE layers, a fixed batch starting
+at a nonzero offset, shard boundaries and exhaustion, stochastic training,
+validation isolation, incompatible resumes, and fresh CLI processes. The
+CUDA stochastic test is skipped when CUDA is unavailable.
