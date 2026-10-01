@@ -331,18 +331,21 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 	recipe_path.write_text(yaml.safe_dump(asdict(recipe)), encoding="utf-8")
 
 	def run(max_steps, checkpoint, *, resume=None, seed=123):
+		run_dir = tmp_path / ("full_run" if resume is None and checkpoint.name == "full.pt" else "partial_run")
 		args = [sys.executable, str(REPO_ROOT / "scripts/train.py"),
 				"--data-dir", str(prepared_data), "--model-config", str(path),
 				"--device", "cpu", "--batch-size", "2", "--seq-len", "8",
 				"--max-steps", str(max_steps), "--log-interval", "1", "--eval-interval", "3",
 				"--eval-batches", "2", "--checkpoint-interval", "2", "--seed", str(seed),
-				"--deterministic", "--checkpoint", str(checkpoint)]
+				"--deterministic", "--run-dir", str(run_dir), "--checkpoint", str(checkpoint)]
 		if overfit:
 			args.append("--overfit-batch")
 		if use_recipe:
 			args.extend(["--training-config", str(recipe_path)])
 		if resume is not None:
-			args.extend(["--resume", str(resume)])
+			# Saved optimizer settings must win, including in the run manifest.
+			args.extend(["--resume", str(resume), "--learning-rate", "0.5",
+						 "--adam-beta1", "0.5", "--adam-beta2", "0.8", "--adam-eps", "0.01"])
 		result = subprocess.run(args, cwd=tmp_path,
 								env={**os.environ, "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"},
 								capture_output=True, text=True, check=False, timeout=60)
@@ -351,8 +354,24 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 
 	continuous = run(5, tmp_path / "full.pt")
 	partial_path = tmp_path / "partial.pt"
-	run(3 if use_recipe else 2, partial_path)
+	partial = run(3 if use_recipe else 2, partial_path)
+	manifest_path = tmp_path / "partial_run" / "run.json"
+	original_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 	resumed = run(5, tmp_path / "resumed.pt", resume=partial_path, seed=999)
+	manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+	assert manifest["run_id"] == original_manifest["run_id"]
+	assert manifest["sessions"][0] == original_manifest["sessions"][0]
+	assert len(manifest["sessions"]) == 2
+	session = manifest["sessions"][-1]
+	assert session["start_state"]["step"] == partial["step"]
+	assert session["start_state"]["tokens_seen"] == partial["tokens_seen"]
+	assert session["start_state"]["loaders"] == partial["loaders"]
+	assert session["train_config"]["max_steps"] == 5
+	assert session["train_config"]["learning_rate"] == partial["train_config"]["learning_rate"]
+	for name in ("adam_beta1", "adam_beta2", "adam_eps", "weight_decay"):
+		assert session["train_config"][name] == partial["train_config"][name]
+	assert session["optimizer"]["param_groups"][0]["lr"] == partial["optimizer"]["param_groups"][0]["lr"]
+	assert session["rng_source"] == "checkpoint"
 	assert resumed["format_version"] == 4
 	assert resumed["train_config"]["gradient_accumulation_steps"] == (2 if use_recipe else 1)
 	for key in ("model", "optimizer", "loaders", "rng_state", "step", "tokens_seen", "overfit_batch_start",
