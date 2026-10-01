@@ -26,17 +26,13 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-import yaml
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-# Support both the src layout and the current internal imports
-# (`from src.kimi_k3...`) used by the repository.
 sys.path.insert(0, str(REPO_ROOT))
-sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from kimi_k3.model import KimiK3, KimiK3Config  # noqa: E402
+from src.kimi_k3.utils.config import load_config
+
+from src.kimi_k3.model import KimiK3, KimiK3Config
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,93 +57,6 @@ def parse_args() -> argparse.Namespace:
 		help="Print the normalized model config before the report.",
 	)
 	return parser.parse_args()
-
-
-def load_config(path: Path) -> KimiK3Config:
-	if not path.is_file():
-		raise FileNotFoundError(f"Config not found: {path}")
-
-	with path.open("r", encoding="utf-8") as f:
-		raw = yaml.safe_load(f)
-
-	if not isinstance(raw, dict):
-		raise ValueError(f"{path} must contain a YAML mapping.")
-
-	expected = {f.name for f in fields(KimiK3Config)}
-	supplied = set(raw)
-
-	missing = sorted(expected - supplied)
-	unknown = sorted(supplied - expected)
-
-	if missing or unknown:
-		messages = []
-		if missing:
-			messages.append("missing fields: " + ", ".join(missing))
-		if unknown:
-			messages.append("unknown fields: " + ", ".join(unknown))
-		raise ValueError("Invalid model config — " + "; ".join(messages))
-
-	# YAML naturally loads sequences as lists; keep the dataclass contract explicit.
-	raw["layer_types"] = tuple(raw["layer_types"])
-
-	config = KimiK3Config(**raw)
-	validate_config(config)
-	return config
-
-
-def validate_config(config: KimiK3Config) -> None:
-	if config.vocab_size <= 0:
-		raise ValueError("vocab_size must be > 0")
-	if config.hidden_size <= 0:
-		raise ValueError("hidden_size must be > 0")
-	if config.num_layers <= 0:
-		raise ValueError("num_layers must be > 0")
-	if config.max_seq_len <= 0:
-		raise ValueError("max_seq_len must be > 0")
-
-	if len(config.layer_types) != config.num_layers:
-		raise ValueError(
-			f"len(layer_types)={len(config.layer_types)} "
-			f"but num_layers={config.num_layers}"
-		)
-
-	invalid_layer_types = sorted(set(config.layer_types) - {"kda", "mla"})
-	if invalid_layer_types:
-		raise ValueError(f"Unknown layer types: {invalid_layer_types}")
-
-	if not 0 <= config.num_dense_layers <= config.num_layers:
-		raise ValueError("num_dense_layers must be in [0, num_layers]")
-
-	if config.attn_res_block_size <= 0:
-		raise ValueError("attn_res_block_size must be > 0")
-
-	if config.kda_num_heads <= 0 or config.kda_head_dim <= 0:
-		raise ValueError("KDA head counts/dimensions must be > 0")
-	if config.kda_short_conv_kernel_size <= 0:
-		raise ValueError("kda_short_conv_kernel_size must be > 0")
-	if config.kda_chunk_size <= 0:
-		raise ValueError("kda_chunk_size must be > 0")
-	if config.max_seq_len % config.kda_chunk_size != 0:
-		raise ValueError(
-			"Current KDAChunkwise requires max_seq_len to be divisible by "
-			f"kda_chunk_size ({config.max_seq_len} % {config.kda_chunk_size} != 0)."
-		)
-
-	if config.mla_num_heads <= 0:
-		raise ValueError("mla_num_heads must be > 0")
-	if config.mla_q_lora_rank >= config.hidden_size:
-		raise ValueError("mla_q_lora_rank must be smaller than hidden_size")
-	if config.mla_kv_lora_rank >= config.hidden_size:
-		raise ValueError("mla_kv_lora_rank must be smaller than hidden_size")
-
-	if config.num_experts <= 0:
-		raise ValueError("num_experts must be > 0")
-	if not 1 <= config.num_experts_per_token <= config.num_experts:
-		raise ValueError("num_experts_per_token must be in [1, num_experts]")
-	if config.num_shared_experts <= 0:
-		raise ValueError("num_shared_experts must be > 0")
-	if config.latent_moe_dim <= 0 or config.expert_intermediate_size <= 0:
-		raise ValueError("MoE dimensions must be > 0")
 
 
 def unique_numel(parameters) -> int:
@@ -380,7 +289,7 @@ def print_report(
 
 def main() -> None:
 	args = parse_args()
-	config = load_config(args.config)
+	config = load_config(args.config, KimiK3Config)
 
 	if args.show_config:
 		print("=== Normalized config ===")

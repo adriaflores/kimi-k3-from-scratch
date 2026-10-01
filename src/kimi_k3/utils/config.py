@@ -33,7 +33,4 @@ def load_config(path: str | Path, config_cls: type[T]) -> T:
 			f"Unknown config fields in {path}: {sorted(unknown)}"
 		)
 
-	if "layer_types" in data:
-		data["layer_types"] = tuple(data["layer_types"])
-
 	return config_cls(**data)

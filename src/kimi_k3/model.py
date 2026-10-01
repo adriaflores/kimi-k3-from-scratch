@@ -233,3 +233,115 @@ class KimiK3Config:
 	# SiTU-GLU
 	situ_beta: float # Beta parameter controlling the nonlinear SiTU activation component.
 	situ_linear_beta: float # Beta parameter controlling SiTU's linear-transition component.
+
+	def __post_init__(self):
+		# Normalize YAML sequences
+		self.layer_types = tuple(self.layer_types)
+
+		# Backbone
+		if self.vocab_size <= 0:
+			raise ValueError("vocab_size must be > 0")
+
+		if self.hidden_size <= 0:
+			raise ValueError("hidden_size must be > 0")
+
+		if self.num_layers <= 0:
+			raise ValueError("num_layers must be > 0")
+
+		if self.rms_norm_eps <= 0:
+			raise ValueError("rms_norm_eps must be > 0")
+
+		if self.initializer_range <= 0:
+			raise ValueError("initializer_range must be > 0")
+
+		if self.max_seq_len <= 0:
+			raise ValueError("max_seq_len must be > 0")
+
+		# Layer schedule
+		if len(self.layer_types) != self.num_layers:
+			raise ValueError(
+				"len(layer_types) must equal num_layers"
+			)
+
+		invalid_types = set(self.layer_types) - {"kda", "mla"}
+		if invalid_types:
+			raise ValueError(
+				f"Unknown layer types: {sorted(invalid_types)}"
+			)
+
+		if not 0 <= self.num_dense_layers <= self.num_layers:
+			raise ValueError(
+				"num_dense_layers must be in [0, num_layers]"
+			)
+
+		if self.attn_res_block_size <= 0:
+			raise ValueError("attn_res_block_size must be > 0")
+
+		# KDA
+		if self.kda_num_heads <= 0:
+			raise ValueError("kda_num_heads must be > 0")
+
+		if self.kda_head_dim <= 0:
+			raise ValueError("kda_head_dim must be > 0")
+
+		if self.kda_short_conv_kernel_size <= 0:
+			raise ValueError(
+				"kda_short_conv_kernel_size must be > 0"
+			)
+
+		if self.kda_chunk_size <= 0:
+			raise ValueError("kda_chunk_size must be > 0")
+
+		# MLA
+		if self.mla_num_heads <= 0:
+			raise ValueError("mla_num_heads must be > 0")
+
+		if not 0 < self.mla_q_lora_rank < self.hidden_size:
+			raise ValueError(
+				"mla_q_lora_rank must be in (0, hidden_size)"
+			)
+
+		if not 0 < self.mla_kv_lora_rank < self.hidden_size:
+			raise ValueError(
+				"mla_kv_lora_rank must be in (0, hidden_size)"
+			)
+
+		if self.mla_qk_nope_head_dim <= 0:
+			raise ValueError("mla_qk_nope_head_dim must be > 0")
+
+		if self.mla_qk_shared_head_dim <= 0:
+			raise ValueError("mla_qk_shared_head_dim must be > 0")
+
+		if self.mla_v_head_dim <= 0:
+			raise ValueError("mla_v_head_dim must be > 0")
+
+		# FFN / MoE
+		if self.dense_intermediate_size <= 0:
+			raise ValueError("dense_intermediate_size must be > 0")
+
+		if self.num_experts <= 0:
+			raise ValueError("num_experts must be > 0")
+
+		if not 1 <= self.num_experts_per_token <= self.num_experts:
+			raise ValueError(
+				"num_experts_per_token must be in [1, num_experts]"
+			)
+
+		if self.num_shared_experts <= 0:
+			raise ValueError("num_shared_experts must be > 0")
+
+		if self.latent_moe_dim <= 0:
+			raise ValueError("latent_moe_dim must be > 0")
+
+		if self.expert_intermediate_size <= 0:
+			raise ValueError("expert_intermediate_size must be > 0")
+
+		if self.routed_scaling_factor <= 0:
+			raise ValueError("routed_scaling_factor must be > 0")
+
+		# SiTU
+		if self.situ_beta <= 0:
+			raise ValueError("situ_beta must be > 0")
+
+		if self.situ_linear_beta <= 0:
+			raise ValueError("situ_linear_beta must be > 0")
