@@ -11,20 +11,23 @@ BATCH_SIZE, SEQ_LEN = 2, 4
 
 
 class _CountingLoader:
-	"""Yields a new deterministic batch on every call and counts the calls."""
+	"""Yields a new deterministic batch on every call, advancing a token cursor and counting the calls."""
 
 	def __init__(self):
 		self.batch_size, self.seq_len = BATCH_SIZE, SEQ_LEN
 		self.dataset = SimpleNamespace(vocab_size=VOCAB_SIZE, total_tokens=10_000)
 		self.calls = 0
+		self.position = 0
 
 	def next_batch(self):
 		self.calls += 1
+		self.position += BATCH_SIZE * SEQ_LEN
 		tokens = (torch.arange(BATCH_SIZE * SEQ_LEN + 1) + self.calls) % VOCAB_SIZE
 		return tokens[:-1].view(BATCH_SIZE, SEQ_LEN), tokens[1:].view(BATCH_SIZE, SEQ_LEN)
 
 	def reset(self):
 		self.calls = 0
+		self.position = 0
 
 
 class _RecordingLM(nn.Module):
