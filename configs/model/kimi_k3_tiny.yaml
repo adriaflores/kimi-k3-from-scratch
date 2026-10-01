@@ -1,0 +1,51 @@
+# Small model for CPU plumbing checks, using the prepared data's vocabulary.
+# Keeps KDA, MLA, dense/MoE FFNs and two AttnRes blocks.
+
+# Backbone
+vocab_size: 49152
+hidden_size: 32
+num_layers: 4
+rms_norm_eps: 1.0e-5
+initializer_range: 0.02
+
+# Context
+max_seq_len: 128
+
+# Layer schedule
+num_dense_layers: 1
+attn_res_block_size: 2
+layer_types: [kda, kda, kda, mla]
+
+# Kimi Delta Attention
+kda_num_heads: 2
+kda_head_dim: 8
+kda_short_conv_kernel_size: 4
+kda_gate_lower_bound: -5.0
+kda_full_rank_output_gate: true
+kda_chunk_size: 4
+
+# Gated MLA
+mla_num_heads: 2
+mla_q_lora_rank: 16
+mla_kv_lora_rank: 8
+mla_qk_nope_head_dim: 8
+mla_qk_shared_head_dim: 4
+mla_v_head_dim: 8
+mla_output_gate: true
+
+# Dense FFN
+dense_intermediate_size: 64
+
+# Stable LatentMoE
+num_experts: 4
+num_experts_per_token: 2
+num_shared_experts: 1
+latent_moe_dim: 16
+expert_intermediate_size: 32
+latent_moe_use_norm: true
+routed_scaling_factor: 1.0
+moe_renormalize: true
+
+# SiTU-GLU
+situ_beta: 4.0
+situ_linear_beta: 25.0
