@@ -82,7 +82,10 @@ class StableLatentMoE(nn.Module):
 		top_scores, top_indices = torch.topk(corrected_scores, k=self.top_k + 1, dim=-1) # (B, T, K + 1), (B, T, K + 1)
 
 		router_scores = router_scores.reshape(B * T, -1) # (BT, E)
-		self.quantile_balancer.update(top_scores=top_scores, router_scores=router_scores)
+
+		if self.training: 
+			self.quantile_balancer.update(top_scores=top_scores, router_scores=router_scores)
+			
 		top_indices = top_indices[..., :-1] # (B, T, K)
 		top_indices = top_indices.reshape(B * T, -1) # (BT, K)
 		
