@@ -131,6 +131,21 @@ def test_quantile_balancer_biases_are_a_non_trainable_buffer():
 	assert not qb.biases.requires_grad
 
 
+def test_quantile_balancer_updates_only_in_training_mode(kda_config_factory):
+	config, moe = _make_moe(kda_config_factory)
+	x = torch.randn(2, 8, config.hidden_size)
+
+	moe.eval()
+	with torch.no_grad():
+		moe(x)
+	torch.testing.assert_close(moe.quantile_balancer.biases, torch.zeros(NUM_EXPERTS), rtol=0, atol=0)
+
+	moe.train()
+	with torch.no_grad():
+		moe(x)
+	assert not torch.equal(moe.quantile_balancer.biases, torch.zeros(NUM_EXPERTS))
+
+
 # End-to-end equivalence
 
 @pytest.mark.parametrize("renormalize", [True, False])
