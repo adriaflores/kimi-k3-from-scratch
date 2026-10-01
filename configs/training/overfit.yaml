@@ -1,0 +1,26 @@
+# configs/training/overfit.yaml
+#
+# First training milestone: deliberately overfit a small fixed slice/batch
+# before committing to full pretraining.
+
+# Data / batching
+batch_size: 4
+seq_len: 128
+gradient_accumulation_steps: 1
+
+# Optimization
+learning_rate: 3.0e-4
+weight_decay: 0.0
+max_steps: 1000
+
+# Evaluation / logging
+log_interval: 10
+eval_interval: 100
+eval_batches: 10
+checkpoint_interval: 100
+
+# Numerics
+precision: bf16
+
+# Reproducibility
+seed: 42

@@ -659,6 +659,7 @@ dependencies = [
     { name = "numpy" },
     { name = "psutil" },
     { name = "pyarrow" },
+    { name = "pyyaml" },
     { name = "torch" },
     { name = "transformers" },
 ]
@@ -676,6 +677,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.3" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "pyarrow", specifier = ">=25.0.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "torch", specifier = ">=2.11.0", index = "https://download.pytorch.org/whl/cu128" },
     { name = "transformers", specifier = ">=5.17.0" },
 ]
