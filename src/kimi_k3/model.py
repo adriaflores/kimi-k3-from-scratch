@@ -322,11 +322,9 @@ class KimiK3Config:
 		if self.num_experts <= 0:
 			raise ValueError("num_experts must be > 0")
 
-		if not 1 <= self.num_experts_per_token <= self.num_experts:
-			raise ValueError(
-				"num_experts_per_token must be in [1, num_experts]"
-			)
-
+		if not 1 <= self.num_experts_per_token < self.num_experts:
+			raise ValueError("num_experts_per_token must be in [1, num_experts)")
+		
 		if self.num_shared_experts <= 0:
 			raise ValueError("num_shared_experts must be > 0")
 
