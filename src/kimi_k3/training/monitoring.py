@@ -27,7 +27,7 @@ class TrainingMonitor:
 			except (psutil.Error, OSError, NotImplementedError):
 				pass  # Process inspection may be unavailable in a container.
 		self._rss_peak = None
-		self.seconds = dict.fromkeys(("train", "eval", "checkpoint", "reporting"), 0.0)
+		self.seconds = dict.fromkeys(("train", "eval", "checkpoint", "reporting", "profiling"), 0.0)
 		self.window_train_seconds = 0.0
 		if metrics is not None and self.device.type == "cuda":
 			torch.cuda.reset_peak_memory_stats(self.device)
