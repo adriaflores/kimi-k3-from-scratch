@@ -10,6 +10,7 @@ from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
 from src.kimi_k3.model import KimiK3
 from src.kimi_k3.training import monitoring, trainer
 from src.kimi_k3.training.metrics import MetricsWriter
+from src.kimi_k3.training.profiling import ProfileConfig
 from src.kimi_k3.training.run import start_run
 from src.kimi_k3.training.trainer import TrainConfig, TrainState, train
 
@@ -234,7 +235,8 @@ def test_moe_records_match_expert_dispatch_with_accumulation_and_intervening_eva
 
 			monkeypatch.setattr(metrics, "write", capture)
 			train(model, optimizer, *loaders, config, device, state=state,
-				  checkpoint_path=run.checkpoint_path, metrics=metrics)
+				  checkpoint_path=run.checkpoint_path, metrics=metrics,
+				  profile_config=ProfileConfig(wait=0, active=1) if force_overflow else None)
 	finally:
 		for handle in handles:
 			handle.remove()
@@ -262,3 +264,9 @@ def test_moe_records_match_expert_dispatch_with_accumulation_and_intervening_eva
 	assert all(layer._expert_load_counts is None for layer in layers.values())
 	checkpoint = torch.load(run.checkpoint_path, weights_only=True)
 	assert not any("expert_load_counts" in name for name in checkpoint["model"])
+	if force_overflow:
+		profile_path = run.directory / "profiles" / run.session_id / "profile.json"
+		profile = json.loads(profile_path.read_text(encoding="utf-8"))
+		assert profile["status"] == "complete" and profile["attempts_completed"] == 2
+		assert profile["end_state"]["step"] < 2
+		assert profile["end_state"]["skipped_updates"] >= 1

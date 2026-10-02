@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
 from src.kimi_k3.model import KimiK3, KimiK3Config
 from src.kimi_k3.training.metrics import MetricsWriter
+from src.kimi_k3.training.profiling import ProfileConfig
 from src.kimi_k3.training.run import start_run
 from src.kimi_k3.training.trainer import (
 	TrainConfig,
@@ -84,6 +85,10 @@ def parse_args(argv=None):
 	parser.add_argument("--overfit-batch", action=argparse.BooleanOptionalAction, default=None,
 						help="Repeat one fixed training batch")
 	parser.add_argument("--deterministic", action="store_true", help="Require deterministic PyTorch kernels")
+	parser.add_argument("--profile", action="store_true", help="Capture one short time/memory profiler window")
+	parser.add_argument("--profile-wait", type=int, default=1, help="Unprofiled optimizer attempts before warmup")
+	parser.add_argument("--profile-warmup", type=int, default=1, help="Profiler warmup attempts (>=1)")
+	parser.add_argument("--profile-active", type=int, default=1, help="Recorded optimizer attempts (>=1)")
 	parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
 	model_selection = parser.add_mutually_exclusive_group(required=True)
 	model_selection.add_argument("--model-config", type=Path, help="Path to a Kimi K3 model YAML")
@@ -101,6 +106,7 @@ def build_train_config(args):
 def main():
 	args = parse_args()
 	config = build_train_config(args)
+	profile_config = ProfileConfig(args.profile_wait, args.profile_warmup, args.profile_active) if args.profile else None
 	device = torch.device(args.device)
 	if device.type not in ("cpu", "cuda"):
 		raise ValueError("Choose cpu, cuda, or cuda:<index>")
@@ -142,6 +148,9 @@ def main():
 	)
 	print(f"Run: {run.directory} | session: {run.session_id}")
 	print(f"Manifest: {run.directory / 'run.json'} | checkpoint: {run.checkpoint_path}")
+	if profile_config is not None:
+		print(f"Profile: {run.directory / 'profiles' / run.session_id} | "
+			  f"wait={profile_config.wait}, warmup={profile_config.warmup}, active={profile_config.active} attempts")
 	print(f"Device: {device} | parameters: {sum(p.numel() for p in model.parameters()):,}")
 	tokens_per_update = config.batch_size * config.seq_len * config.gradient_accumulation_steps
 	print(f"AdamW betas=({config.adam_beta1}, {config.adam_beta2}) | eps={config.adam_eps:g}"
@@ -160,7 +169,8 @@ def main():
 	with MetricsWriter(run) as metrics:
 		print(f"Metrics: {metrics.path}")
 		train(model, optimizer, train_loader, val_loader, config, device,
-			  state=state, checkpoint_path=run.checkpoint_path, metrics=metrics)
+			  state=state, checkpoint_path=run.checkpoint_path, metrics=metrics,
+			  profile_config=profile_config)
 
 
 if __name__ == "__main__":

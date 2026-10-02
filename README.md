@@ -133,8 +133,8 @@ failure can lose the unfinished logging interval; completed records are kept.
 Flush does not guarantee persistence through an OS or power failure.
 
 The writer reuses scalar losses and gradient norms already computed by the
-trainer, without retaining tensors. MoE diagnostics are described below;
-optional profiling is the following monitoring step.
+trainer, without retaining tensors. MoE diagnostics and optional profiling
+are described below.
 
 ```bash
 uv run python -m pytest -q tests/unit/training/test_metrics.py \
@@ -164,7 +164,7 @@ serialization and file I/O. All events also contain:
 | `session.elapsed_seconds` | Wall time since the training loop began in this invocation |
 | `session.tokens` | Consumed training tokens since this session started; excludes restored tokens and validation tokens |
 | `session.tokens_per_second` | Session tokens divided by wall time, including completed validation, checkpoints and reports |
-| `session.train_seconds`, `eval_seconds`, `checkpoint_seconds`, `reporting_seconds` | Cumulative phase costs within this session; reporting covers diagnostic snapshots, memory sampling, console printing and JSONL writes |
+| `session.train_seconds`, `eval_seconds`, `checkpoint_seconds`, `reporting_seconds`, `profiling_seconds` | Cumulative phase costs within this session; reporting covers diagnostic snapshots, memory sampling, console printing and JSONL writes; profiling covers schedule transitions and artifact export, and is zero when disabled |
 | `memory.ram_rss_bytes` | Process resident RAM in bytes, sampled with the existing psutil dependency |
 | `memory.ram_rss_sampled_peak_bytes` | Largest RSS sample in this session; does not capture short-lived peaks between samples |
 | `memory.cuda_allocated_bytes`, `cuda_reserved_bytes` | Current tensor allocation and caching-allocator reservation on the selected device |
@@ -236,8 +236,7 @@ are excluded from checkpoints. No training/configuration format changes.
 
 Use load ratios and counts to spot sustained concentration or unused experts
 before profiling dispatch. Interval totals can hide imbalance within individual
-microbatches; this initial monitor does not collect per-token routes or expert
-execution times.
+microbatches; this initial monitor does not collect per-token routes.
 
 ```bash
 uv run python -m pytest -q tests/unit/training \
@@ -245,6 +244,85 @@ uv run python -m pytest -q tests/unit/training \
   tests/integration/test_training_metrics.py \
   tests/integration/test_train_cli.py tests/integration/test_checkpoint_resume.py
 ```
+
+### Bounded profiling
+
+Add `--profile` to capture one short PyTorch profiler window. It defaults to
+one wait attempt, one warmup attempt and one recorded attempt. These are
+local optimizer attempts in the current invocation, including skipped FP16
+attempts; each includes all accumulated microbatches. Normal training creates
+no profiler, profiling hooks or output directory.
+
+```bash
+uv run python scripts/train.py \
+  --data-dir C:/datasets/fineweb_edu_6b \
+  --model-config configs/model/kimi_k3_tiny.yaml \
+  --training-config configs/training/smoke.yaml \
+  --device cuda --max-steps 10 \
+  --profile --profile-wait 2 --profile-warmup 1 --profile-active 1
+```
+
+The CLI prints the output folder: `RUN/profiles/SESSION_ID/`. Each profiling
+invocation uses a separate folder, including resume; previous captures remain
+intact. Its settings and run/session IDs are recorded in `profile.json` and
+the `session_start` metric. Match those IDs to `run.json` for seed, commit,
+architecture, recipe and data provenance. Profiling is an observation setting,
+separate from TrainConfig and checkpoint format 4.
+
+| Artifact | Use |
+| --- | --- |
+| `trace.json.gz` | Compressed Chrome-format timeline; decompress if your trace viewer requires JSON, then inspect operator ordering, GPU kernels when supported, and allocation events |
+| `summary.txt` | Top operators by self CPU/CUDA time and net self tensor memory; also lists inclusive phase/module totals |
+| `profile.json` | Capture settings, status, completed attempts, start/end counters, CUDA timing capability and the region totals |
+
+Regions distinguish `train/data` (including transfer), `train/forward`
+(including loss extraction), `train/backward`, `train/optimizer` (including
+unscaling/clipping), `train/eval`, `train/checkpoint` and `train/report`.
+Temporary hooks label training forwards by family: `model/KDAChunkwise`,
+`model/GatedMLA`, `model/DenseFFN` and `model/StableLatentMoE`, summed across
+layers. Family totals exclude validation and cover forward work; backward
+operators appear within `train/backward`. Auxiliary regions appear only when
+their cadence falls inside the active window.
+
+The recorder stops and removes its hooks when the window completes; training
+continues normally. If training ends early, status is `partial` when any active
+work was captured, or `no_capture` when it never reached the active window.
+No empty trace is presented as a completed capture. Exceptions also close
+temporary hooks and preserve an available partial trace.
+
+CPU activities and tensor-allocation accounting are enabled; CUDA is also
+requested on a CUDA device. PyTorch can fall back to legacy CUDA event timings
+when its build lacks CUPTI tracing: device times may remain available in the
+tables, while the JSON has no on-device kernel lanes. Capability and whether
+any CUDA times were captured are explicit in `profile.json`. Shapes, stacks,
+FLOP estimates and full memory histories are omitted.
+
+Use this for diagnosis, then measure throughput/memory with `--profile`
+disabled. Recording, annotations and extra synchronization at attempt
+boundaries perturb profiled training; schedule/export costs also affect wall
+time and are tracked in `session.profiling_seconds`. Inclusive totals overlap,
+so do not sum nested regions. Memory tables show allocation-minus-release
+bytes attributed to operations, not peak residency or total process RAM;
+pre-existing tensors may lack allocation history. Session CUDA peaks and
+sampled RSS remain in `metrics.jsonl`.
+Even a tiny eager model can emit many events. Compression reduces disk size;
+recorder memory still depends on event count, including gradient accumulation.
+
+For the Python API, pass `profile_config=ProfileConfig(...)` to `train`; it
+uses the metrics writer's run/session folder. Without a writer, also provide
+an unused `profile_dir`. Import ProfileConfig from
+`src.kimi_k3.training.profiling`.
+
+```bash
+uv run python -m pytest -q tests/unit/training \
+  tests/unit/moe/test_stable_latent_moe.py \
+  tests/integration/test_training_metrics.py \
+  tests/integration/test_training_profiling.py \
+  tests/integration/test_train_cli.py tests/integration/test_checkpoint_resume.py
+```
+
+References: [PyTorch profiler API](https://docs.pytorch.org/docs/2.11/profiler.html)
+and [profiler recipe](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
 
 ### Initial training recipe
 

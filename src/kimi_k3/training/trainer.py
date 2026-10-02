@@ -17,6 +17,7 @@ import torch
 from .metrics import TrainingWindow
 from .moe_metrics import MoEDiagnostics
 from .monitoring import TrainingMonitor
+from .profiling import TrainingProfiler
 
 
 @dataclass
@@ -337,7 +338,8 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 
 
 def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
-		  device, *, state: TrainState | None = None, checkpoint_path=None, metrics=None) -> TrainState:
+		  device, *, state: TrainState | None = None, checkpoint_path=None, metrics=None,
+		  profile_config=None, profile_dir=None) -> TrainState:
 	"""Train until max_steps successful optimizer updates, including restored steps.
 
 	Uses TokenDataLoader.next_batch()/reset(); the loader itself is unchanged.
@@ -390,10 +392,13 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 		fixed_batch = (x.to(device), y.to(device))
 
 	monitor = TrainingMonitor(device, metrics)
-	with MoEDiagnostics(model, enabled=metrics is not None) as moe:
+	with TrainingProfiler(model, device, state, profile_config,
+						  directory=profile_dir, metrics=metrics) as profiling, \
+		 MoEDiagnostics(model, enabled=metrics is not None) as moe:
 		monitor.begin(state)
 		monitor.report("session_start", state,
-					   discarded_tail_bytes=metrics.discarded_tail_bytes if metrics is not None else 0)
+					   discarded_tail_bytes=metrics.discarded_tail_bytes if metrics is not None else 0,
+					   profiling=profiling.describe())
 		monitor.resume_train()
 		consecutive_skips = 0
 		while state.step < config.max_steps:
@@ -404,52 +409,61 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 			update_loss = 0.0
 			update_tokens = 0
 			for _ in range(config.gradient_accumulation_steps):
-				if fixed_batch is None:
-					try:
-						batch_start = train_loader.position
-						x, y = train_loader.next_batch()
-					except StopIteration:
-						train_loader.reset()
-						batch_start = train_loader.position
-						x, y = train_loader.next_batch()
-					x, y = x.to(device), y.to(device)
-					if config.overfit_batch:
-						state.overfit_batch_start = batch_start
-						fixed_batch = (x, y)
-				else:
-					x, y = fixed_batch
-				with _autocast(device, config.precision):
-					_, loss = model(x, targets=y)
-				value = loss.item()
+				with profiling.region("train/data"):
+					if fixed_batch is None:
+						try:
+							batch_start = train_loader.position
+							x, y = train_loader.next_batch()
+						except StopIteration:
+							train_loader.reset()
+							batch_start = train_loader.position
+							x, y = train_loader.next_batch()
+						x, y = x.to(device), y.to(device)
+						if config.overfit_batch:
+							state.overfit_batch_start = batch_start
+							fixed_batch = (x, y)
+					else:
+						x, y = fixed_batch
+				with profiling.region("train/forward"):
+					with _autocast(device, config.precision):
+						_, loss = model(x, targets=y)
+					value = loss.item()
 				if not math.isfinite(value):
 					raise FloatingPointError(f"Non-finite training loss at step {step}")
-				scaler.scale(loss / config.gradient_accumulation_steps).backward()
+				with profiling.region("train/backward"):
+					scaler.scale(loss / config.gradient_accumulation_steps).backward()
 				update_loss += value / config.gradient_accumulation_steps
 				update_tokens += y.numel()
 				state.tokens_seen += y.numel()
-			scaler.unscale_(optimizer)
-			grad_norm = torch.nn.utils.clip_grad_norm_(
-				model.parameters(), config.max_grad_norm or float("inf"),
-				error_if_nonfinite=not scaler.is_enabled(),
-			).item()
-			previous_scale = scaler.get_scale()
-			scaler.step(optimizer)
-			scaler.update()
-			state.grad_scaler_state = scaler.state_dict() if scaler.is_enabled() else None
-			optimizer.zero_grad(set_to_none=True)
-			skipped = scaler.get_scale() < previous_scale
+			with profiling.region("train/optimizer"):
+				scaler.unscale_(optimizer)
+				grad_norm = torch.nn.utils.clip_grad_norm_(
+					model.parameters(), config.max_grad_norm or float("inf"),
+					error_if_nonfinite=not scaler.is_enabled(),
+				).item()
+				previous_scale = scaler.get_scale()
+				scaler.step(optimizer)
+				scaler.update()
+				state.grad_scaler_state = scaler.state_dict() if scaler.is_enabled() else None
+				optimizer.zero_grad(set_to_none=True)
+				skipped = scaler.get_scale() < previous_scale
 			window.add(update_loss, update_tokens, grad_norm,
 					   skipped=skipped, max_grad_norm=config.max_grad_norm)
 			if skipped:
 				state.skipped_updates += 1
 				consecutive_skips += 1
 				monitor.pause_train()
-				monitor.report("overflow", state, attempted_step=step, lr=lr,
-							   loss_scale=scaler.get_scale(), train_loss=update_loss,
-							   grad_norm=grad_norm if math.isfinite(grad_norm) else None,
-							   grad_norm_finite=math.isfinite(grad_norm), tokens=update_tokens,
-							   message=f"step {step} | FP16 overflow: update skipped"
-							   f" | loss_scale {scaler.get_scale():g} | skipped {state.skipped_updates}")
+				with profiling.region("train/report"):
+					monitor.report("overflow", state, attempted_step=step, lr=lr,
+								   loss_scale=scaler.get_scale(), train_loss=update_loss,
+								   grad_norm=grad_norm if math.isfinite(grad_norm) else None,
+								   grad_norm_finite=math.isfinite(grad_norm), tokens=update_tokens,
+								   message=f"step {step} | FP16 overflow: update skipped"
+								   f" | loss_scale {scaler.get_scale():g} | skipped {state.skipped_updates}")
+				if profiling.running:
+					started = monitor.now()
+					profiling.step()
+					monitor.finish_phase("profiling", started)
 				if consecutive_skips >= 32:
 					raise FloatingPointError("32 consecutive FP16 updates skipped; check numerics or use FP32")
 				monitor.resume_train()
@@ -462,32 +476,45 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 			save_now = checkpoint_path is not None and (
 				step % config.checkpoint_interval == 0 or final
 			)
-			if log_now or eval_now or save_now:
+			if log_now or eval_now or save_now or profiling.running:
 				monitor.pause_train()
 				if log_now:
 					interval = monitor.interval_summary(window)
-					monitor.report("train", state, **window.summary(lr), **interval,
-								   moe_diagnostics=moe,
-								   message=f"step {step} | train loss {window.loss_sum / window.tokens:.4f}"
-								   f" | lr {lr:.6g} | grad_norm {grad_norm:.4f}"
-								   f" | tokens_seen {state.tokens_seen:,}"
-								   f" | tokens/s {interval['train_tokens_per_second'] or 0:,.0f}")
+					with profiling.region("train/report"):
+						monitor.report("train", state, **window.summary(lr), **interval,
+									   moe_diagnostics=moe,
+									   message=f"step {step} | train loss {window.loss_sum / window.tokens:.4f}"
+									   f" | lr {lr:.6g} | grad_norm {grad_norm:.4f}"
+									   f" | tokens_seen {state.tokens_seen:,}"
+									   f" | tokens/s {interval['train_tokens_per_second'] or 0:,.0f}")
 					window = TrainingWindow()
 					monitor.window_train_seconds = 0.0
 				if eval_now:
 					started = monitor.now()
-					val_loss = evaluate(model, val_loader, device, config.eval_batches, precision=config.precision)
+					with profiling.region("train/eval"):
+						val_loss = evaluate(model, val_loader, device, config.eval_batches, precision=config.precision)
 					elapsed = monitor.finish_phase("eval", started)
-					monitor.report("val", state, val_loss=val_loss, eval_seconds=elapsed,
-								   message=f"step {step} | val loss {val_loss:.4f}"
-								   f" | tokens_seen {state.tokens_seen:,}")
+					with profiling.region("train/report"):
+						monitor.report("val", state, val_loss=val_loss, eval_seconds=elapsed,
+									   message=f"step {step} | val loss {val_loss:.4f}"
+									   f" | tokens_seen {state.tokens_seen:,}")
 				if save_now:
 					started = monitor.now()
-					save_checkpoint(checkpoint_path, model, optimizer, state, config,
-									vocab_size=train_loader.dataset.vocab_size,
-									train_loader=train_loader, val_loader=val_loader)
+					with profiling.region("train/checkpoint"):
+						save_checkpoint(checkpoint_path, model, optimizer, state, config,
+										vocab_size=train_loader.dataset.vocab_size,
+										train_loader=train_loader, val_loader=val_loader)
 					elapsed = monitor.finish_phase("checkpoint", started)
-					monitor.report("checkpoint", state, checkpoint_seconds=elapsed)
+					with profiling.region("train/report"):
+						monitor.report("checkpoint", state, checkpoint_seconds=elapsed)
+				if profiling.running:
+					started = monitor.now()
+					profiling.step()
+					monitor.finish_phase("profiling", started)
 				monitor.resume_train()
+		if profiling.running:
+			started = monitor.now()
+			profiling.finish()
+			monitor.finish_phase("profiling", started)
 		monitor.report("session_end", state)
 		return state
