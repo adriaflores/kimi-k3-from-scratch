@@ -7,13 +7,16 @@ It must not retain an inference cache or recurrent state between calls.
 import math
 import os
 import random
-import time
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 
 import numpy as np
 import torch
+
+from .metrics import TrainingWindow
+from .moe_metrics import MoEDiagnostics
+from .monitoring import TrainingMonitor
 
 
 @dataclass
@@ -334,7 +337,7 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 
 
 def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
-		  device, *, state: TrainState | None = None, checkpoint_path=None) -> TrainState:
+		  device, *, state: TrainState | None = None, checkpoint_path=None, metrics=None) -> TrainState:
 	"""Train until max_steps successful optimizer updates, including restored steps.
 
 	Uses TokenDataLoader.next_batch()/reset(); the loader itself is unchanged.
@@ -345,6 +348,7 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 	Each update averages equal-size microbatch losses. QB updates per forward,
 	so accumulation is not equivalent to concatenation for stateful MoE routing.
 	FP16 overflow skips AdamW and LR progression; consumed tokens and QB remain.
+	An optional open MetricsWriter records scalar metrics without changing state.
 	"""
 	state = TrainState() if state is None else state
 	# Preserve the direct API: a fresh optimizer supplies the schedule's peak LR.
@@ -372,19 +376,12 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 		if loader.dataset.total_tokens < config.batch_size * config.seq_len + 1:
 			raise ValueError("Each split must contain at least one full batch")
 
-	def synchronize():
-		if device.type == "cuda":
-			torch.cuda.synchronize(device)
-
 	model.train()
 	optimizer.zero_grad(set_to_none=True)
 	scaler = torch.amp.GradScaler(device.type, enabled=config.precision == "fp16")
 	if state.grad_scaler_state is not None:
 		scaler.load_state_dict(state.grad_scaler_state)
-	window_loss = 0.0
-	window_tokens = 0
-	window_steps = 0
-	training_seconds = 0.0
+	window = TrainingWindow()
 	fixed_batch = None
 	if config.overfit_batch and state.overfit_batch_start is not None:
 		x, y = train_loader.dataset.get_batch(
@@ -392,89 +389,105 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 		)
 		fixed_batch = (x.to(device), y.to(device))
 
-	synchronize()
-	started = time.perf_counter()
-	consecutive_skips = 0
-	while state.step < config.max_steps:
-		step = state.step + 1
-		lr = learning_rate_at_step(config, step)
-		for group in optimizer.param_groups:
-			group["lr"] = lr
-		update_loss = 0.0
-		update_tokens = 0
-		for _ in range(config.gradient_accumulation_steps):
-			if fixed_batch is None:
-				try:
-					batch_start = train_loader.position
-					x, y = train_loader.next_batch()
-				except StopIteration:
-					train_loader.reset()
-					batch_start = train_loader.position
-					x, y = train_loader.next_batch()
-				x, y = x.to(device), y.to(device)
-				if config.overfit_batch:
-					state.overfit_batch_start = batch_start
-					fixed_batch = (x, y)
-			else:
-				x, y = fixed_batch
-			with _autocast(device, config.precision):
-				_, loss = model(x, targets=y)
-			value = loss.item()
-			if not math.isfinite(value):
-				raise FloatingPointError(f"Non-finite training loss at step {step}")
-			scaler.scale(loss / config.gradient_accumulation_steps).backward()
-			update_loss += value / config.gradient_accumulation_steps
-			update_tokens += y.numel()
-			state.tokens_seen += y.numel()
-		scaler.unscale_(optimizer)
-		grad_norm = torch.nn.utils.clip_grad_norm_(
-			model.parameters(), config.max_grad_norm or float("inf"),
-			error_if_nonfinite=not scaler.is_enabled(),
-		).item()
-		previous_scale = scaler.get_scale()
-		scaler.step(optimizer)
-		scaler.update()
-		state.grad_scaler_state = scaler.state_dict() if scaler.is_enabled() else None
-		optimizer.zero_grad(set_to_none=True)
-		window_loss += update_loss
-		window_tokens += update_tokens
-		window_steps += 1
-		if scaler.get_scale() < previous_scale:
-			state.skipped_updates += 1
-			consecutive_skips += 1
-			print(f"step {step} | FP16 overflow: update skipped"
-				  f" | loss_scale {scaler.get_scale():g} | skipped {state.skipped_updates}", flush=True)
-			if consecutive_skips >= 32:
-				raise FloatingPointError("32 consecutive FP16 updates skipped; check numerics or use FP32")
-			continue
+	monitor = TrainingMonitor(device, metrics)
+	with MoEDiagnostics(model, enabled=metrics is not None) as moe:
+		monitor.begin(state)
+		monitor.report("session_start", state,
+					   discarded_tail_bytes=metrics.discarded_tail_bytes if metrics is not None else 0)
+		monitor.resume_train()
 		consecutive_skips = 0
-		state.step = step
-		final = step == config.max_steps
-		log_now = step % config.log_interval == 0 or final
-		eval_now = step % config.eval_interval == 0 or final
-		save_now = checkpoint_path is not None and (
-			step % config.checkpoint_interval == 0 or final
-		)
-		if log_now or eval_now or save_now:
-			synchronize()
-			training_seconds += time.perf_counter() - started
-			if log_now:
-				print(f"step {step} | train loss {window_loss / window_steps:.4f}"
-					  f" | lr {lr:.6g} | grad_norm {grad_norm:.4f}"
-					  f" | tokens_seen {state.tokens_seen:,}"
-					  f" | tokens/s {window_tokens / training_seconds:,.0f}", flush=True)
-				window_loss = 0.0
-				window_tokens = window_steps = 0
-				training_seconds = 0.0
-			if eval_now:
-				val_loss = evaluate(model, val_loader, device, config.eval_batches, precision=config.precision)
-				print(f"step {step} | val loss {val_loss:.4f}"
-					  f" | tokens_seen {state.tokens_seen:,}", flush=True)
-			if save_now:
-				save_checkpoint(checkpoint_path, model, optimizer, state, config,
-								vocab_size=train_loader.dataset.vocab_size,
-								train_loader=train_loader, val_loader=val_loader)
-			# Exclude validation, checkpoint I/O and logging from throughput.
-			synchronize()
-			started = time.perf_counter()
-	return state
+		while state.step < config.max_steps:
+			step = state.step + 1
+			lr = learning_rate_at_step(config, step)
+			for group in optimizer.param_groups:
+				group["lr"] = lr
+			update_loss = 0.0
+			update_tokens = 0
+			for _ in range(config.gradient_accumulation_steps):
+				if fixed_batch is None:
+					try:
+						batch_start = train_loader.position
+						x, y = train_loader.next_batch()
+					except StopIteration:
+						train_loader.reset()
+						batch_start = train_loader.position
+						x, y = train_loader.next_batch()
+					x, y = x.to(device), y.to(device)
+					if config.overfit_batch:
+						state.overfit_batch_start = batch_start
+						fixed_batch = (x, y)
+				else:
+					x, y = fixed_batch
+				with _autocast(device, config.precision):
+					_, loss = model(x, targets=y)
+				value = loss.item()
+				if not math.isfinite(value):
+					raise FloatingPointError(f"Non-finite training loss at step {step}")
+				scaler.scale(loss / config.gradient_accumulation_steps).backward()
+				update_loss += value / config.gradient_accumulation_steps
+				update_tokens += y.numel()
+				state.tokens_seen += y.numel()
+			scaler.unscale_(optimizer)
+			grad_norm = torch.nn.utils.clip_grad_norm_(
+				model.parameters(), config.max_grad_norm or float("inf"),
+				error_if_nonfinite=not scaler.is_enabled(),
+			).item()
+			previous_scale = scaler.get_scale()
+			scaler.step(optimizer)
+			scaler.update()
+			state.grad_scaler_state = scaler.state_dict() if scaler.is_enabled() else None
+			optimizer.zero_grad(set_to_none=True)
+			skipped = scaler.get_scale() < previous_scale
+			window.add(update_loss, update_tokens, grad_norm,
+					   skipped=skipped, max_grad_norm=config.max_grad_norm)
+			if skipped:
+				state.skipped_updates += 1
+				consecutive_skips += 1
+				monitor.pause_train()
+				monitor.report("overflow", state, attempted_step=step, lr=lr,
+							   loss_scale=scaler.get_scale(), train_loss=update_loss,
+							   grad_norm=grad_norm if math.isfinite(grad_norm) else None,
+							   grad_norm_finite=math.isfinite(grad_norm), tokens=update_tokens,
+							   message=f"step {step} | FP16 overflow: update skipped"
+							   f" | loss_scale {scaler.get_scale():g} | skipped {state.skipped_updates}")
+				if consecutive_skips >= 32:
+					raise FloatingPointError("32 consecutive FP16 updates skipped; check numerics or use FP32")
+				monitor.resume_train()
+				continue
+			consecutive_skips = 0
+			state.step = step
+			final = step == config.max_steps
+			log_now = step % config.log_interval == 0 or final
+			eval_now = step % config.eval_interval == 0 or final
+			save_now = checkpoint_path is not None and (
+				step % config.checkpoint_interval == 0 or final
+			)
+			if log_now or eval_now or save_now:
+				monitor.pause_train()
+				if log_now:
+					interval = monitor.interval_summary(window)
+					monitor.report("train", state, **window.summary(lr), **interval,
+								   moe_diagnostics=moe,
+								   message=f"step {step} | train loss {window.loss_sum / window.tokens:.4f}"
+								   f" | lr {lr:.6g} | grad_norm {grad_norm:.4f}"
+								   f" | tokens_seen {state.tokens_seen:,}"
+								   f" | tokens/s {interval['train_tokens_per_second'] or 0:,.0f}")
+					window = TrainingWindow()
+					monitor.window_train_seconds = 0.0
+				if eval_now:
+					started = monitor.now()
+					val_loss = evaluate(model, val_loader, device, config.eval_batches, precision=config.precision)
+					elapsed = monitor.finish_phase("eval", started)
+					monitor.report("val", state, val_loss=val_loss, eval_seconds=elapsed,
+								   message=f"step {step} | val loss {val_loss:.4f}"
+								   f" | tokens_seen {state.tokens_seen:,}")
+				if save_now:
+					started = monitor.now()
+					save_checkpoint(checkpoint_path, model, optimizer, state, config,
+									vocab_size=train_loader.dataset.vocab_size,
+									train_loader=train_loader, val_loader=val_loader)
+					elapsed = monitor.finish_phase("checkpoint", started)
+					monitor.report("checkpoint", state, checkpoint_seconds=elapsed)
+				monitor.resume_train()
+		monitor.report("session_end", state)
+		return state

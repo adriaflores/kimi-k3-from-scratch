@@ -66,6 +66,23 @@ def test_cli_trains_and_saves_selected_model(prepared_data, tmp_path, smoke_test
 		checkpoint = run_dir / "last.pt"
 	manifest = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
 	session = manifest["sessions"][0]
+	records = [json.loads(line) for line in (run_dir / "metrics.jsonl").read_text(
+		encoding="utf-8").splitlines()]
+	assert [record["event"] for record in records] == [
+		"session_start", "train", "train", "val", "checkpoint", "session_end"]
+	assert all(record["run_id"] == manifest["run_id"] and record["session_id"] == session["session_id"]
+			   for record in records)
+	assert [record["step"] for record in records if record["event"] == "train"] == [1, 2]
+	assert records[-1]["step"] == 2
+	assert records[-1]["tokens_seen"] == 16
+	assert records[-1]["session"]["tokens"] == 16
+	assert records[-1]["session"]["elapsed_seconds"] > 0
+	assert records[-1]["session"]["tokens_per_second"] > 0
+	rss = records[-1]["memory"]["ram_rss_bytes"]
+	assert rss is None or rss > 0
+	if rss is not None:
+		assert records[-1]["memory"]["ram_rss_sampled_peak_bytes"] >= rss
+	assert all(value is None for key, value in records[-1]["memory"].items() if key.startswith("cuda_"))
 	assert session["train_config"]["seed"] == 123
 	assert session["train_config"]["seq_len"] == 8
 	assert session["checkpoint_path"] == str(checkpoint)
@@ -76,6 +93,19 @@ def test_cli_trains_and_saves_selected_model(prepared_data, tmp_path, smoke_test
 	assert saved["optimizer"]["state"]
 	assert session["model_config"] == json.loads(json.dumps(saved["model_config"]))
 	assert all(torch.isfinite(weight).all() for weight in saved["model"].values())
+	for record in records:
+		if record["event"] != "train":
+			continue
+		if smoke_test:
+			assert record["moe"] == {}
+		else:
+			architecture = saved["model_config"]
+			assert set(record["moe"]) == {
+				f"layers.{i}.ffn" for i in range(architecture["num_dense_layers"], architecture["num_layers"])}
+			for layer in record["moe"].values():
+				assert layer["tokens"] == record["tokens"] == 8
+				assert sum(layer["expert_counts"]) == 8 * architecture["num_experts_per_token"]
+				assert len(layer["qb_biases"]) == architecture["num_experts"]
 	if smoke_test:
 		assert saved["model_config"]["model_type"] == "smoke_test_lm"
 	else:

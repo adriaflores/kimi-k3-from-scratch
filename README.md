@@ -93,9 +93,158 @@ When using a checkpoint outside the run folder, pass the original `--run-dir`
 to retain its identity. Existing manifests reject unrelated checkpoint paths
 or different model/data identities. Checkpoints inside the run folder also
 record a relative path, so moving the whole folder retains the run identity.
-This is CLI bookkeeping: checkpoint format
-4 and the direct Python `train` API are unchanged. Metrics and profiling will
-be added separately.
+This is CLI bookkeeping: checkpoint format 4 remains unchanged. The direct
+Python `train` API accepts an optional open metrics writer.
+
+### Persistent learning metrics
+
+The CLI writes `metrics.jsonl` beside `run.json`. The JSONL writer uses only
+the standard library. Each newline-terminated record is flushed after writing and
+includes schema version, UTC timestamp, run/session IDs, successful update
+`step`, cumulative `tokens_seen` and cumulative `skipped_updates`.
+
+Events are `session_start`, `train`, `val`, `checkpoint`, `overflow` and `session_end`.
+`train` follows `log_interval` and always includes the final partial interval;
+`val` follows `eval_interval` and the final update. Validation does not reset
+the training aggregation window. `session_end` marks normal completion.
+
+| Train field | Meaning within the current logging interval |
+| --- | --- |
+| `train_loss` | Mean token loss over consumed tokens, including skipped FP16 attempts |
+| `lr` | LR used for the most recent successful update |
+| `tokens` | Consumed target tokens, including skipped attempts |
+| `attempted_updates`, `updates` | All attempts and successful optimizer updates, respectively |
+| `skipped_updates_in_window` | Attempts discarded by FP16 GradScaler |
+| `grad_norm_mean`, `grad_norm_max` | Global L2 norm after accumulation/unscaling and before clipping, over successful updates |
+| `clipped_fraction` | Fraction of successful updates whose norm exceeds the enabled clipping threshold; zero when disabled |
+| `nonfinite_grad_norms` | Number of attempts with a non-finite gradient norm |
+
+`val` records contain `val_loss`. Every FP16 overflow also produces an immediate
+`overflow` record with attempted step, LR, loss scale, loss and consumed tokens.
+Its gradient norm is `null` when non-finite, with `grad_norm_finite=false`;
+non-finite values are never emitted as invalid JSON `NaN`/`Infinity`.
+
+Resume appends to the same file without rewriting completed records. Logging
+windows restart per session. If an older checkpoint is resumed, step numbers
+can overlap: use `session_id` and the starting checkpoint/counters in `run.json`
+to identify each trajectory. An interrupted final line is discarded before
+appending, with its byte count recorded in the next `session_start`. A process
+failure can lose the unfinished logging interval; completed records are kept.
+Flush does not guarantee persistence through an OS or power failure.
+
+The writer reuses scalar losses and gradient norms already computed by the
+trainer, without retaining tensors. MoE diagnostics are described below;
+optional profiling is the following monitoring step.
+
+```bash
+uv run python -m pytest -q tests/unit/training/test_metrics.py \
+  tests/integration/test_training_metrics.py \
+  tests/integration/test_train_cli.py tests/integration/test_checkpoint_resume.py
+```
+
+Metric semantics follow PyTorch's [gradient clipping API](https://docs.pytorch.org/docs/2.11/generated/torch.nn.utils.clip_grad_norm_.html)
+and [AMP accumulation/clipping examples](https://docs.pytorch.org/docs/2.11/notes/amp_examples.html).
+
+### Timing, throughput and memory
+
+`train` events add `train_seconds`, `train_tokens_per_second` and
+`seconds_per_attempt`. They cover the same interval as the loss/gradient
+statistics: data loading, transfers, forward/backward and optimizer work,
+including skipped attempts. Validation, checkpoint I/O and reports are excluded.
+The console's existing `tokens/s` value uses this training-only interval.
+CUDA is synchronized at phase/report boundaries, including overflows, rather
+than introducing a new synchronization for each normal update.
+
+`val` records include their individual `eval_seconds`. A `checkpoint` event
+after each successful save records `checkpoint_seconds`, including GPU-to-CPU
+serialization and file I/O. All events also contain:
+
+| Object / field | Meaning |
+| --- | --- |
+| `session.elapsed_seconds` | Wall time since the training loop began in this invocation |
+| `session.tokens` | Consumed training tokens since this session started; excludes restored tokens and validation tokens |
+| `session.tokens_per_second` | Session tokens divided by wall time, including completed validation, checkpoints and reports |
+| `session.train_seconds`, `eval_seconds`, `checkpoint_seconds`, `reporting_seconds` | Cumulative phase costs within this session; reporting covers diagnostic snapshots, memory sampling, console printing and JSONL writes |
+| `memory.ram_rss_bytes` | Process resident RAM in bytes, sampled with the existing psutil dependency |
+| `memory.ram_rss_sampled_peak_bytes` | Largest RSS sample in this session; does not capture short-lived peaks between samples |
+| `memory.cuda_allocated_bytes`, `cuda_reserved_bytes` | Current tensor allocation and caching-allocator reservation on the selected device |
+| `memory.cuda_peak_allocated_bytes`, `cuda_peak_reserved_bytes` | CUDA allocator peaks since session start, including temporary allocations between samples |
+
+Timing is sampled before the current report's own I/O; that report's cost
+appears in following records. Use `session_end` for the complete loop's
+throughput: it includes the final validation and checkpoint, and excludes only
+its own final report. Setup, model construction and checkpoint restoration
+precede the measured loop. Resume starts new timers and memory peaks without
+altering checkpoint format or RNG. Rates are `null` when no time has elapsed.
+
+Memory is sampled at event boundaries, without polling threads or model hooks.
+CUDA peaks are reset once per session; the allocator cache is preserved. CUDA
+fields are `null` on CPU. Allocator statistics measure PyTorch-managed memory,
+not the full GPU usage shown by system tools or allocations from other processes.
+RAM is process RSS, including resident data pages rather than only model tensors.
+RSS is `null` when the OS/container does not permit process inspection; valid
+previous RSS samples still contribute to the sampled peak.
+
+Compare the same batch/context, precision, hardware and logging/evaluation/save
+intervals. First intervals can include optimizer allocation or kernel warmup;
+later `train_tokens_per_second` windows are more useful for steady-state
+comparisons. The cumulative wall rate measures the cost of the complete recipe.
+
+```bash
+uv run python -m pytest -q tests/unit/training \
+  tests/integration/test_training_metrics.py \
+  tests/integration/test_train_cli.py tests/integration/test_checkpoint_resume.py
+```
+
+See PyTorch's [allocated](https://docs.pytorch.org/docs/2.11/generated/torch.cuda.memory.max_memory_allocated.html)
+and [reserved](https://docs.pytorch.org/docs/2.11/generated/torch.cuda.memory.max_memory_reserved.html)
+peak counters and [CUDA synchronization](https://docs.pytorch.org/docs/2.11/generated/torch.cuda.synchronize.html).
+
+### MoE loads and Quantile Balancing
+
+Each `train` record adds a `moe` object keyed by the module path, such as
+`layers.1.ffn`. It covers every StableLatentMoE layer; dense layers and shared
+experts are excluded. Models without routed experts produce `moe: {}`.
+
+| Per-layer field | Meaning |
+| --- | --- |
+| `tokens` | Training tokens routed in the logging interval |
+| `expert_counts` | Integer assignments per routed expert, in expert-index order; their sum is `tokens * top_k` |
+| `max_load_over_mean` | Busiest expert's count divided by the mean count; 1 means equal loads |
+| `zero_load_experts` | Number of routed experts with no assignments during the interval |
+| `qb_biases` | Latest QB bias vector, in expert-index order, after the last training forward |
+
+Counts use the actual biased top-k dispatch, excluding the extra `(k+1)`th
+selection used by QB. They accumulate across microbatches and optimizer
+attempts, including skipped FP16 attempts: those forwards consumed data and
+updated QB. Validation neither contributes to nor resets these counts.
+Logging and a new/resumed session start a fresh count window. A window with
+no routed tokens has `null` load ratio and zero-load summary.
+
+QB biases are snapshots, not interval averages. The most recent forward used
+the preceding biases and then updated them for the next forward. Reading the
+snapshot does not update QB; evaluation still freezes its buffers. A non-finite
+bias is recorded as `null`, without changing the underlying buffer.
+
+Collection is enabled only when `train` receives an open metrics writer, as
+the CLI does. The eager dispatch already knows each expert's token count;
+diagnostics add Python integer totals, without a second routing histogram,
+extra GPU kernels or per-forward synchronization. Only the small bias vectors
+are copied to CPU at train-log boundaries, inside the measured reporting cost.
+Counters retain no tensors, are removed on normal or exceptional exit, and
+are excluded from checkpoints. No training/configuration format changes.
+
+Use load ratios and counts to spot sustained concentration or unused experts
+before profiling dispatch. Interval totals can hide imbalance within individual
+microbatches; this initial monitor does not collect per-token routes or expert
+execution times.
+
+```bash
+uv run python -m pytest -q tests/unit/training \
+  tests/unit/moe/test_stable_latent_moe.py \
+  tests/integration/test_training_metrics.py \
+  tests/integration/test_train_cli.py tests/integration/test_checkpoint_resume.py
+```
 
 ### Initial training recipe
 

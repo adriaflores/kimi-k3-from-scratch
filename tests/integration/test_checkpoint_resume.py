@@ -18,8 +18,11 @@ from torch import nn
 
 from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
 from src.kimi_k3.model import KimiK3
+from src.kimi_k3.training.metrics import MetricsWriter
+from src.kimi_k3.training.run import start_run
 from src.kimi_k3.training.trainer import (
 	TrainConfig,
+	TrainState,
 	build_optimizer,
 	evaluate,
 	learning_rate_at_step,
@@ -154,14 +157,22 @@ def test_kimi_resume_matches_continuous_updates(prepared_data, tmp_path, kda_con
 
 	partial_model, partial_optimizer, partial_config, partial_loaders = construct(123, stop_step)
 	checkpoint = tmp_path / "interrupted.pt"
-	train(partial_model, partial_optimizer, *partial_loaders, partial_config, device,
-		  checkpoint_path=checkpoint)
+	partial_run = start_run(model=partial_model, optimizer=partial_optimizer, config=partial_config,
+							state=TrainState(), train_loader=partial_loaders[0], val_loader=partial_loaders[1],
+							repo_root=tmp_path, runs_root=tmp_path / "runs", checkpoint_path=checkpoint)
+	with MetricsWriter(partial_run) as metrics:
+		train(partial_model, partial_optimizer, *partial_loaders, partial_config, device,
+			  checkpoint_path=checkpoint, metrics=metrics)
 	resumed_model, resumed_optimizer, resumed_config, resumed_loaders = construct(999, 5)
 	state = load_checkpoint(checkpoint, resumed_model, resumed_optimizer, resumed_config,
 							vocab_size=32, train_loader=resumed_loaders[0], val_loader=resumed_loaders[1])
 	resumed_losses = _record_training_losses(resumed_model)
-	resumed_state = train(resumed_model, resumed_optimizer, *resumed_loaders,
-						  resumed_config, device, state=state)
+	resumed_run = start_run(model=resumed_model, optimizer=resumed_optimizer, config=resumed_config,
+							state=state, train_loader=resumed_loaders[0], val_loader=resumed_loaders[1],
+							repo_root=tmp_path, run_dir=partial_run.directory, resume_path=checkpoint)
+	with MetricsWriter(resumed_run) as metrics:
+		resumed_state = train(resumed_model, resumed_optimizer, *resumed_loaders,
+							  resumed_config, device, state=state, metrics=metrics)
 
 	assert resumed_losses == full_losses[stop_step:]
 	assert asdict(resumed_state) == asdict(full_state)
@@ -355,6 +366,8 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 	continuous = run(5, tmp_path / "full.pt")
 	partial_path = tmp_path / "partial.pt"
 	partial = run(3 if use_recipe else 2, partial_path)
+	metrics_path = tmp_path / "partial_run" / "metrics.jsonl"
+	original_metrics = metrics_path.read_bytes()
 	manifest_path = tmp_path / "partial_run" / "run.json"
 	original_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 	resumed = run(5, tmp_path / "resumed.pt", resume=partial_path, seed=999)
@@ -372,6 +385,29 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 		assert session["train_config"][name] == partial["train_config"][name]
 	assert session["optimizer"]["param_groups"][0]["lr"] == partial["optimizer"]["param_groups"][0]["lr"]
 	assert session["rng_source"] == "checkpoint"
+	assert metrics_path.read_bytes().startswith(original_metrics)
+	records = [json.loads(line) for line in metrics_path.read_text(encoding="utf-8").splitlines()]
+	assert all(record["run_id"] == manifest["run_id"] for record in records)
+	for run_session, start, end in ((manifest["sessions"][0], 0, partial["step"]),
+									  (session, partial["step"], 5)):
+		segment = [record for record in records if record["session_id"] == run_session["session_id"]]
+		assert segment[0]["event"] == "session_start" and segment[0]["step"] == start
+		assert segment[-1]["event"] == "session_end" and segment[-1]["step"] == end
+		assert segment[0]["session"]["tokens"] == 0
+		assert segment[-1]["session"]["tokens"] == segment[-1]["tokens_seen"] - segment[0]["tokens_seen"]
+		assert segment[-1]["session"]["elapsed_seconds"] > 0
+		assert segment[-1]["session"]["eval_seconds"] > 0
+		assert segment[-1]["session"]["checkpoint_seconds"] > 0
+		updates = [record for record in segment if record["event"] == "train"]
+		assert [record["step"] for record in updates] == list(range(start + 1, end + 1))
+		assert [record["lr"] for record in updates] == [
+			learning_rate_at_step(TrainConfig(**resumed["train_config"]), step) for step in range(start + 1, end + 1)]
+		for record in updates:
+			assert set(record["moe"]) == {f"layers.{i}.ffn" for i in (1, 2, 3)}
+			for layer in record["moe"].values():
+				assert layer["tokens"] == record["tokens"] == (32 if use_recipe else 16)
+				assert sum(layer["expert_counts"]) == layer["tokens"] * 2
+				assert len(layer["qb_biases"]) == 4
 	assert resumed["format_version"] == 4
 	assert resumed["train_config"]["gradient_accumulation_steps"] == (2 if use_recipe else 1)
 	for key in ("model", "optimizer", "loaders", "rng_state", "step", "tokens_seen", "overfit_batch_start",
@@ -504,7 +540,7 @@ def test_v3_resume_preserves_original_recipe(prepared_data, tmp_path):
 
 
 @CUDA_REQUIRED
-def test_cuda_fp16_overflow_does_not_advance_optimizer_or_warmup(prepared_data):
+def test_cuda_fp16_overflow_does_not_advance_optimizer_or_warmup(prepared_data, tmp_path):
 	from scripts.train import SmokeTestLM
 
 	_seed(123)
@@ -525,9 +561,29 @@ def test_cuda_fp16_overflow_does_not_advance_optimizer_or_warmup(prepared_data):
 	model.head.weight.register_hook(overflow_once)
 	lrs = []
 	optimizer.register_step_pre_hook(lambda optimizer, args, kwargs: lrs.append(optimizer.param_groups[0]["lr"]))
-	state = train(model, optimizer, *loaders, config, "cuda")
+	initial_state = TrainState()
+	run = start_run(model=model, optimizer=optimizer, config=config, state=initial_state,
+					train_loader=loaders[0], val_loader=loaders[1], repo_root=tmp_path,
+					runs_root=tmp_path / "runs")
+	with MetricsWriter(run) as metrics:
+		state = train(model, optimizer, *loaders, config, "cuda", state=initial_state, metrics=metrics)
 	assert state.step == 3
 	assert state.skipped_updates >= 1
 	assert state.grad_scaler_state["scale"] < 65536
 	assert state.tokens_seen == (3 + state.skipped_updates) * 2 * 8 * 2
 	assert lrs == [learning_rate_at_step(config, step) for step in range(1, 4)]
+	records = [json.loads(line) for line in (run.directory / "metrics.jsonl").read_text(
+		encoding="utf-8").splitlines()]
+	overflows = [record for record in records if record["event"] == "overflow"]
+	assert len(overflows) == state.skipped_updates
+	assert overflows[0]["step"] == 0 and overflows[0]["attempted_step"] == 1
+	assert overflows[0]["grad_norm"] is None and not overflows[0]["grad_norm_finite"]
+	updates = [record for record in records if record["event"] == "train"]
+	assert sum(record["tokens"] for record in updates) == state.tokens_seen
+	assert sum(record["skipped_updates_in_window"] for record in updates) == state.skipped_updates
+	assert sum(record["nonfinite_grad_norms"] for record in updates) == state.skipped_updates
+	assert [record["lr"] for record in updates] == lrs
+	assert records[-1]["session"]["tokens"] == state.tokens_seen
+	assert sum(record["train_seconds"] for record in updates) == pytest.approx(
+		records[-1]["session"]["train_seconds"])
+	assert records[-1]["memory"]["cuda_peak_allocated_bytes"] > 0

@@ -16,6 +16,7 @@ from torch.nn import functional as F
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
 from src.kimi_k3.model import KimiK3, KimiK3Config
+from src.kimi_k3.training.metrics import MetricsWriter
 from src.kimi_k3.training.run import start_run
 from src.kimi_k3.training.trainer import (
 	TrainConfig,
@@ -156,8 +157,10 @@ def main():
 		print("SMOKE TEST: toy model only; these are not Kimi K3 results.")
 	else:
 		print(f"KimiK3 | model config: {args.model_config}")
-	train(model, optimizer, train_loader, val_loader, config, device,
-		  state=state, checkpoint_path=run.checkpoint_path)
+	with MetricsWriter(run) as metrics:
+		print(f"Metrics: {metrics.path}")
+		train(model, optimizer, train_loader, val_loader, config, device,
+			  state=state, checkpoint_path=run.checkpoint_path, metrics=metrics)
 
 
 if __name__ == "__main__":
