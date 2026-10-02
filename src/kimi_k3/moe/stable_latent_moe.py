@@ -1,8 +1,9 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
-from src.kimi_k3.ffn import DenseFFN as Expert, SituGLU
+from src.kimi_k3.ffn import DenseFFN as Expert
+from src.kimi_k3.ffn import SituGLU
 
 
 class QuantileBalancer(nn.Module):
@@ -66,6 +67,8 @@ class StableLatentMoE(nn.Module):
 		self.up_latent_proj = nn.Linear(self.latent_moe_dim, self.d_model, bias=False)
 
 		self.quantile_balancer = QuantileBalancer(num_experts=self.num_routed_experts, k=self.top_k)
+		# Optional Python counters owned by a diagnostics context, not state_dict.
+		self._expert_load_counts = None
 
 
 	def forward(self, x):
@@ -97,9 +100,12 @@ class StableLatentMoE(nn.Module):
 
 		routed_output = z.new_zeros(B*T, self.latent_moe_dim) # Match the autocast expert output dtype.
 
+		load_counts = self._expert_load_counts if self.training else None
 		for expert_j in range(self.num_routed_experts):
 			mask = top_indices == expert_j # (BT, K)
 			token_indices, k_indices = mask.nonzero(as_tuple=True) # (q_j), (q_j)
+			if load_counts is not None:
+				load_counts[expert_j] += token_indices.numel()
 
 			if token_indices.numel() == 0:
 				continue
