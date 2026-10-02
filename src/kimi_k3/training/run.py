@@ -119,6 +119,8 @@ def start_run(*, model, optimizer, config, state, train_loader, val_loader,
 					   else resume_path if manifest is not None else run_dir / "last.pt")
 	if checkpoint_path.name == "run.json":
 		raise ValueError("Checkpoint path cannot overwrite run.json")
+	if checkpoint_path == run_dir / "metrics.jsonl":
+		raise ValueError("Checkpoint path cannot overwrite metrics.jsonl")
 	session_id = uuid4().hex
 	session = {
 		"session_id": session_id, "started_at": now.isoformat(),

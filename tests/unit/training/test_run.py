@@ -114,6 +114,9 @@ def test_existing_run_or_unrelated_checkpoint_cannot_overwrite_manifest(run_argu
 		start_run(**run_arguments, run_dir=run.directory, resume_path=tmp_path / "unrelated.pt")
 	with pytest.raises(ValueError, match="overwrite run.json"):
 		start_run(**run_arguments, resume_path=run.checkpoint_path, checkpoint_path=path)
+	with pytest.raises(ValueError, match="overwrite metrics.jsonl"):
+		start_run(**run_arguments, resume_path=run.checkpoint_path,
+				  checkpoint_path=run.directory / "metrics.jsonl")
 	assert path.read_bytes() == before
 
 
