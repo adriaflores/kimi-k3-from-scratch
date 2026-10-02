@@ -55,6 +55,9 @@ YAMLs remain reserved for later runtime work; select the device with `--device`.
 Use `--overfit-batch` to repeat the first training batch. Quantile Balancing
 updates only in training mode; validation preserves the training RNG state.
 
+See the [tiny training circuit](docs/notes/tiny_training_check.md) for the
+pre-GPU next-token check, validation isolation, and checkpoint/resume acceptance.
+
 ### Monitoring and profiling
 
 Every CLI run writes `run.json`, `metrics.jsonl` and, by default, `last.pt`
