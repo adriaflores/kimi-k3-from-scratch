@@ -97,13 +97,27 @@ class StableLatentMoE(nn.Module):
 		weights = torch.gather(router_scores, dim=-1, index=top_indices) # (BT, K)
 		if self.moe_renormalize:
 			weights = F.normalize(weights, p=1, dim=-1)
+		
+		expert_ids = top_indices.flatten() # (BTK)
+		flat_weights = weights.flatten() # (BTK)
 
-		routed_output = z.new_zeros(B*T, self.latent_moe_dim) # Match the autocast expert output dtype.
+		order = torch.argsort(expert_ids, stable=True)
+
+		sorted_token_ids = order // self.top_k
+		sorted_weights = flat_weights[order]
+
+		counts = torch.bincount(expert_ids, minlength=self.num_routed_experts)
+		ends = torch.cumsum(counts, dim=0).tolist()
 
 		load_counts = self._expert_load_counts if self.training else None
+		routed_output = z.new_zeros(B*T, self.latent_moe_dim) # Match the autocast expert output dtype.
+		start = 0
 		for expert_j in range(self.num_routed_experts):
-			mask = top_indices == expert_j # (BT, K)
-			token_indices, k_indices = mask.nonzero(as_tuple=True) # (q_j), (q_j)
+			end = ends[expert_j]
+			token_indices = sorted_token_ids[start:end] # (q_j)
+			expert_weights = sorted_weights[start:end].unsqueeze(-1) * self.routed_scaling_factor # (q_j, 1)
+			start = end
+
 			if load_counts is not None:
 				load_counts[expert_j] += token_indices.numel()
 
@@ -112,7 +126,6 @@ class StableLatentMoE(nn.Module):
 
 			z_e = z[token_indices] # (q_j, D_latent), where q_j is the number of tokens assigned to the j-th expert
 			y_e = self.experts[expert_j](z_e) # (q_j, D_latent)
-			expert_weights = weights[token_indices, k_indices].unsqueeze(-1) * self.routed_scaling_factor # (q_j, 1)
 			expert_weights = expert_weights.to(y_e.dtype)
 			expert_output = y_e * expert_weights # (q_j, D_latent)
 
