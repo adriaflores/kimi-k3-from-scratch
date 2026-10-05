@@ -26,12 +26,11 @@ class DenseFFN(nn.Module):
 		self.intermediate_size = intermediate_size
 		self.act_fn = situ
 
-		self.gate = nn.Linear(self.d_model, self.intermediate_size, bias=False)
-		self.up_proj = nn.Linear(self.d_model, self.intermediate_size, bias=False)
+		self.gate_up_proj = nn.Linear(self.d_model, 2 * self.intermediate_size, bias=False)
 		self.down_proj = nn.Linear(self.intermediate_size, self.d_model,  bias=False)
 
 	def forward(self, x):
-		gate_up = torch.cat([self.gate(x), self.up_proj(x)], dim=-1) # (B, T, 2 * I)
+		gate_up = self.gate_up_proj(x) # (B, T, 2 * I)
 		down_proj = self.down_proj(self.act_fn(gate_up)) # (B, T, C)
 
 		return down_proj
