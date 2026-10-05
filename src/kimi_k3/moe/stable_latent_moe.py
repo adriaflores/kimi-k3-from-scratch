@@ -5,6 +5,7 @@ from torch import nn
 from src.kimi_k3.ffn import DenseFFN as Expert
 from src.kimi_k3.ffn import SituGLU
 
+from src.kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
 
 class QuantileBalancer(nn.Module):
 
@@ -63,7 +64,7 @@ class StableLatentMoE(nn.Module):
 
 			]
 		)
-		self.post_router_rmsnorms = nn.RMSNorm(self.latent_moe_dim, eps=config.rms_norm_eps)
+		self.post_router_rmsnorms = MixedPrecisionRMSNorm(self.latent_moe_dim, eps=config.rms_norm_eps)
 		self.up_latent_proj = nn.Linear(self.latent_moe_dim, self.d_model, bias=False)
 
 		self.quantile_balancer = QuantileBalancer(num_experts=self.num_routed_experts, k=self.top_k)

@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from src.kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
+
 class GatedMLA(nn.Module):
 
 	def __init__(self, config):
@@ -16,8 +18,8 @@ class GatedMLA(nn.Module):
 		self.dv_head = config.mla_v_head_dim
 		self.output_gate = config.mla_output_gate
 
-		self.q_rmsnorm = nn.RMSNorm(normalized_shape=self.q_latent_dim, eps=config.rms_norm_eps)
-		self.kv_rmsnorm = nn.RMSNorm(normalized_shape=self.kv_latent_dim, eps=config.rms_norm_eps)
+		self.q_rmsnorm = MixedPrecisionRMSNorm(normalized_shape=self.q_latent_dim, eps=config.rms_norm_eps)
+		self.kv_rmsnorm = MixedPrecisionRMSNorm(normalized_shape=self.kv_latent_dim, eps=config.rms_norm_eps)
 
 		if self.q_latent_dim >= self.d_model:
 			raise ValueError("q_latent_dim must be smaller than d_model")

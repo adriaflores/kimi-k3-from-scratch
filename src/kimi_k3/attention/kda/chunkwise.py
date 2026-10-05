@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from src.kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
+
 class KDAChunkwise(nn.Module):
 
 	def __init__(self, config):
@@ -27,7 +29,7 @@ class KDAChunkwise(nn.Module):
 		self.Wb = nn.Linear(self.d_model, self.num_heads, bias = False)
 		self.Wad = nn.Linear(self.d_model, self.d_head, bias = False)
 		self.Wau = nn.Linear(self.d_head, self.num_heads * self.d_head, bias = False)
-		self.out_norm = nn.RMSNorm(self.d_head, eps=config.rms_norm_eps)
+		self.out_norm = MixedPrecisionRMSNorm(self.d_head, eps=config.rms_norm_eps)
 
 		self.full_rank_output_gate = config.kda_full_rank_output_gate
 		if self.full_rank_output_gate:

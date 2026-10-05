@@ -10,6 +10,7 @@ from src.kimi_k3.attention import GatedMLA
 from src.kimi_k3.moe import StableLatentMoE
 from src.kimi_k3.ffn import DenseFFN, SituGLU
 
+from src.kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
 
 def build_kda(config):
 	if config.kda_implementation == "fused":
@@ -19,7 +20,7 @@ def build_kda(config):
 	return KDAChunkwise(config)
 
 
-def apply_attn_res(block_residual: torch.Tensor, prefix_sum: torch.Tensor, norm: nn.RMSNorm, proj: nn.Linear):
+def apply_attn_res(block_residual: torch.Tensor, prefix_sum: torch.Tensor, norm: MixedPrecisionRMSNorm, proj: nn.Linear):
 	# We use tensors in their reshaped form
 
 	V = torch.cat([
@@ -65,14 +66,14 @@ class KimiK3DecoderBlock(nn.Module):
 			self.ffn = StableLatentMoE(config)
 
 		# PreNorms
-		self.attn_norm = nn.RMSNorm(C, eps=config.rms_norm_eps)
-		self.ffn_norm = nn.RMSNorm(C, eps=config.rms_norm_eps)
+		self.attn_norm = MixedPrecisionRMSNorm(C, eps=config.rms_norm_eps)
+		self.ffn_norm = MixedPrecisionRMSNorm(C, eps=config.rms_norm_eps)
 
 		# Attention Residual
-		self.attn_res_norm = nn.RMSNorm(C, eps=config.rms_norm_eps)
+		self.attn_res_norm = MixedPrecisionRMSNorm(C, eps=config.rms_norm_eps)
 		self.attn_res_proj = nn.Linear(C, 1, bias=False)
 
-		self.mlp_res_norm = nn.RMSNorm(C, eps=config.rms_norm_eps)
+		self.mlp_res_norm = MixedPrecisionRMSNorm(C, eps=config.rms_norm_eps)
 		self.mlp_res_proj = nn.Linear(C, 1, bias=False)
 
 
@@ -136,13 +137,13 @@ class KimiK3(nn.Module):
 		])
 
 		# Final normalization
-		self.norm = nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+		self.norm = MixedPrecisionRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
 		# Language-model head
 		self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
 		# Attention Residual output mixing
-		self.output_attn_res_norm = nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+		self.output_attn_res_norm = MixedPrecisionRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 		self.output_attn_res_proj = nn.Linear(config.hidden_size, 1, bias=False)
 
 		self.apply(self._init_weights)
