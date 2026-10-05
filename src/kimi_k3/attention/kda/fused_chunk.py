@@ -46,6 +46,9 @@ class FusedKDAChunkwise(nn.Module):
 		self.gate_lower_bound = config.kda_gate_lower_bound
 
 	def forward(self, x):
+		if not x.is_cuda:
+			raise RuntimeError("The fused KDA runs FLA Triton kernels and needs CUDA; use kda_implementation: chunkwise on CPU")
+
 		B, T, _ = x.shape
 
 		q, k, v = self.QKV(x).split(self.kda_dim, dim=-1) # (B, T, KDA) each matrix

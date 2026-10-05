@@ -209,6 +209,7 @@ def print_config_summary(config: KimiK3Config) -> None:
 	print(f"Shared experts:       {config.num_shared_experts}")
 	print(f"Max sequence length:  {config.max_seq_len:,}")
 	print(f"KDA chunk size:       {config.kda_chunk_size}")
+	print(f"KDA implementation:   {config.kda_implementation}")
 
 
 def print_report(

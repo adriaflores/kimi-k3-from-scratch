@@ -40,6 +40,7 @@ kda_short_conv_kernel_size: 4
 kda_gate_lower_bound: -5.0
 kda_full_rank_output_gate: true
 kda_chunk_size: 64
+kda_implementation: fused
 
 # Gated MLA
 mla_num_heads: 8

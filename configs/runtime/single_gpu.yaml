@@ -4,10 +4,6 @@
 
 device: cuda
 
-# KDA execution
-kda_implementation: chunkwise
-kda_chunk_size: 64
-
 # PyTorch runtime
 compile: false
 num_workers: 4

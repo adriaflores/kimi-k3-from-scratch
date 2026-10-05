@@ -59,7 +59,9 @@ def build_model(vocab_size, seq_len, *, model_config_path=None, smoke_test=False
 		)
 	if seq_len > config.max_seq_len:
 		raise ValueError(f"seq_len={seq_len} exceeds model max_seq_len={config.max_seq_len}")
-	if "kda" in config.layer_types and seq_len % config.kda_chunk_size != 0:
+	# The fused kernel pads the last chunk itself; only the PyTorch reference needs whole chunks.
+	if ("kda" in config.layer_types and config.kda_implementation == "chunkwise"
+			and seq_len % config.kda_chunk_size != 0):
 		raise ValueError(
 			f"seq_len={seq_len} must be divisible by kda_chunk_size={config.kda_chunk_size}"
 		)

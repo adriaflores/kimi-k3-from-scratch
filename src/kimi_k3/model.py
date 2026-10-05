@@ -4,11 +4,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.kimi_k3.attention import KDAChunkwise as KDA
+from src.kimi_k3.attention import KDAChunkwise
 from src.kimi_k3.attention import GatedMLA
 
 from src.kimi_k3.moe import StableLatentMoE
 from src.kimi_k3.ffn import DenseFFN, SituGLU
+
+
+def build_kda(config):
+	if config.kda_implementation == "fused":
+		# Imported lazily so CPU-only runs never load fla/Triton.
+		from src.kimi_k3.attention.kda.fused_chunk import FusedKDAChunkwise
+		return FusedKDAChunkwise(config)
+	return KDAChunkwise(config)
 
 
 def apply_attn_res(block_residual: torch.Tensor, prefix_sum: torch.Tensor, norm: nn.RMSNorm, proj: nn.Linear):
@@ -40,7 +48,7 @@ class KimiK3DecoderBlock(nn.Module):
 		layer_type = config.layer_types[layer_idx]
 
 		if layer_type == "kda":
-			self.attn = KDA(config)
+			self.attn = build_kda(config)
 
 		elif layer_type == "mla":
 			self.attn = GatedMLA(config)
@@ -206,7 +214,8 @@ class KimiK3Config:
 	kda_short_conv_kernel_size: int # Kernel size of the short causal convolutions applied to Q, K and V.
 	kda_gate_lower_bound: float # Lower bound applied to KDA's decay/update gate for numerical stability.
 	kda_full_rank_output_gate: bool # Whether KDA's output gate uses a full-rank projection instead of the factorized low-rank projection.
-	kda_chunk_size: int # Number of tokens per chunk in the chunkwise KDA; the sequence length must be divisible by it.
+	kda_chunk_size: int # Number of tokens per KDA chunk; "chunkwise" needs the sequence length divisible by it, "fused" accepts 32 or 64.
+	kda_implementation: str # "chunkwise" (readable PyTorch reference, any device) or "fused" (FLA Triton kernel, CUDA only).
 
 	# Gated MLA
 	mla_num_heads: int # Number of Multi-Head Latent Attention heads.
@@ -291,6 +300,23 @@ class KimiK3Config:
 
 		if self.kda_chunk_size <= 0:
 			raise ValueError("kda_chunk_size must be > 0")
+
+		if self.kda_implementation not in ("chunkwise", "fused"):
+			raise ValueError(
+				"kda_implementation must be 'chunkwise' or 'fused'"
+			)
+
+		# Limits enforced by fla's chunk_kda with safe_gate=True.
+		if self.kda_implementation == "fused":
+			if self.kda_chunk_size not in (32, 64):
+				raise ValueError(
+					"kda_chunk_size must be 32 or 64 for the fused KDA"
+				)
+
+			if not -5 <= self.kda_gate_lower_bound < 0:
+				raise ValueError(
+					"kda_gate_lower_bound must be in [-5, 0) for the fused KDA"
+				)
 
 		# MLA
 		if self.mla_num_heads <= 0:
