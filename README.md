@@ -46,8 +46,17 @@ uv run python scripts/train.py --data-dir /path/to/fineweb_edu_6b \
 Use `configs/model/kimi_k3_300m.yaml` for the candidate architecture. Inspect its
 parameter budget with `uv run python scripts/inspect_config.py configs/model/kimi_k3_300m.yaml`.
 The trainer checks that the model vocabulary matches the data, that `seq_len`
-fits the context limit, and that KDA sequences are divisible by the chunk size.
+fits the context limit, and that KDA sequences are divisible by the chunk size
+when the chunkwise KDA is selected.
 `--smoke-test` selects the existing toy model instead of a model YAML.
+
+`kda_implementation` in the model YAML selects the KDA kernel. `fused`, used by
+the 300M config, runs FLA's Triton `chunk_kda` and needs CUDA, `kda_chunk_size`
+32 or 64 and `kda_gate_lower_bound` in [-5, 0); it accepts any sequence length.
+`chunkwise`, used by the tiny config, is the readable PyTorch reference and runs
+on any device. The first fused run compiles and autotunes Triton kernels, which
+can take minutes; later runs reuse the cache. `chunk_size: 32` currently fails
+with a misaligned-address error on `triton-windows`, so keep 64 there.
 
 Load a complete training recipe with `--training-config`; explicit CLI values
 override its fields. Training YAMLs use the shared config loader. Runtime
@@ -116,7 +125,8 @@ not known before measuring the chosen model and hardware.
 All presets start in FP32 as a numerical reference. `--precision bf16` uses
 autocast on CPU or CUDA with native BF16 support; `--precision fp16` uses CUDA
 autocast and GradScaler. Parameters, gradients and AdamW moments stay FP32.
-The KDA solve/recurrent core and MoE router/QB remain FP32 under autocast.
+The chunkwise KDA solve/recurrent core and MoE router/QB remain FP32 under
+autocast; the fused KDA follows FLA's kernel precision.
 Training and validation use the same precision. Follow PyTorch's
 [AMP order](https://docs.pytorch.org/docs/stable/notes/amp_examples.html):
 average microbatch losses, accumulate scaled gradients, unscale once, clip,
