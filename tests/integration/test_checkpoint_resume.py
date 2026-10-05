@@ -124,6 +124,12 @@ def _record_training_losses(model):
 	return losses
 
 
+def _skipped_by_grad_scaler(optimizer):
+	# GradScaler still calls step() on fused optimizers and passes found_inf so the kernel skips the update.
+	found_inf = getattr(optimizer, "found_inf", None)
+	return found_inf is not None and found_inf.item() > 0
+
+
 def _next_random_values(device="cpu"):
 	return {"python": [random.random(), random.gauss(0, 1)],
 			"numpy": [np.random.random(), np.random.normal()],
@@ -280,7 +286,7 @@ def test_loader_resume_accepts_relocated_manifest_with_different_json_formatting
 
 @pytest.mark.parametrize("case", ["batch_size", "seq_len", "overfit_batch", "manifest", "cursor", "legacy",
 	"gradient_accumulation_steps", "precision", "lr_schedule", "warmup_steps", "max_grad_norm",
-	"decay_steps", "min_lr_ratio"])
+	"decay_steps", "min_lr_ratio", "adam_fused"])
 def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tmp_path, case):
 	_seed(123)
 	model = StochasticLM()
@@ -295,7 +301,8 @@ def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tm
 	config = replace(config, max_steps=5)
 	incompatible = {"batch_size": 1, "seq_len": 4, "overfit_batch": True,
 					"gradient_accumulation_steps": 2, "precision": "bf16", "lr_schedule": "cosine",
-					"warmup_steps": 1, "max_grad_norm": 0.1, "decay_steps": 1001, "min_lr_ratio": 0.2}
+					"warmup_steps": 1, "max_grad_norm": 0.1, "decay_steps": 1001, "min_lr_ratio": 0.2,
+					"adam_fused": False}
 	if case in incompatible:
 		config = replace(config, **{case: incompatible[case]})
 	directory = _prepare_data(tmp_path / "changed", offset=1) if case == "manifest" else prepared_data
@@ -324,6 +331,38 @@ def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tm
 	assert random.getstate() == rng_before[0]
 	np.testing.assert_equal(np.random.get_state(), rng_before[1])
 	torch.testing.assert_close(torch.get_rng_state(), rng_before[2], rtol=0, atol=0)
+
+
+def test_v4_checkpoint_without_adam_fused_resumes_unfused(prepared_data, tmp_path):
+	# Version 4 checkpoints predate adam_fused and were trained unfused.
+	_seed(123)
+	model = StochasticLM()
+	optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0)
+	config = replace(_train_config(), max_steps=2, adam_fused=False)
+	checkpoint = tmp_path / "resume.pt"
+	train(model, optimizer, *_loaders(prepared_data, config), config, "cpu", checkpoint_path=checkpoint)
+	saved = torch.load(checkpoint, weights_only=True)
+	del saved["train_config"]["adam_fused"]
+	torch.save(saved, checkpoint)
+
+	config = replace(config, max_steps=5)
+	target = StochasticLM()
+	target_optimizer = torch.optim.AdamW(target.parameters(), lr=3e-4)
+	loaders = _loaders(prepared_data, config)
+	# A current-format checkpoint must carry every recipe field.
+	with pytest.raises(KeyError, match="adam_fused"):
+		load_checkpoint(checkpoint, target, target_optimizer, config, vocab_size=32,
+						train_loader=loaders[0], val_loader=loaders[1])
+
+	saved["format_version"] = 4
+	torch.save(saved, checkpoint)
+	state = load_checkpoint(checkpoint, target, target_optimizer, config, vocab_size=32,
+							train_loader=loaders[0], val_loader=loaders[1])
+
+	assert state.step == 2
+	with pytest.raises(ValueError, match="adam_fused"):
+		load_checkpoint(checkpoint, target, target_optimizer, replace(config, adam_fused=True), vocab_size=32,
+						train_loader=loaders[0], val_loader=loaders[1])
 
 
 @pytest.mark.parametrize("overfit", [False, True])
@@ -408,7 +447,7 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 				assert layer["tokens"] == record["tokens"] == (32 if use_recipe else 16)
 				assert sum(layer["expert_counts"]) == layer["tokens"] * 2
 				assert len(layer["qb_biases"]) == 4
-	assert resumed["format_version"] == 4
+	assert resumed["format_version"] == 5
 	assert resumed["train_config"]["gradient_accumulation_steps"] == (2 if use_recipe else 1)
 	for key in ("model", "optimizer", "loaders", "rng_state", "step", "tokens_seen", "overfit_batch_start",
 				"skipped_updates", "grad_scaler_state"):
@@ -449,6 +488,8 @@ def test_recipe_resume_keeps_accumulation_lr_precision_and_scaler(
 		lrs, clipped_norms = [], []
 
 		def record(optimizer, args, kwargs):
+			if _skipped_by_grad_scaler(optimizer):
+				return
 			lrs.append(optimizer.param_groups[0]["lr"])
 			clipped_norms.append(torch.cat([
 				p.grad.detach().flatten() for p in model.parameters() if p.grad is not None]).norm().item())
@@ -512,7 +553,8 @@ def test_v3_resume_preserves_original_recipe(prepared_data, tmp_path):
 	def construct(seed, max_steps):
 		_seed(seed)
 		model = StochasticLM()
-		config = replace(_train_config(), max_steps=max_steps)
+		# v3 predates adam_fused, so resuming it requires the unfused optimizer it was trained with.
+		config = replace(_train_config(), max_steps=max_steps, adam_fused=False)
 		# The previous CLI used AdamW's beta2=0.999, not the new recipe's 0.95.
 		optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=0)
 		return model, optimizer, config, _loaders(prepared_data, config)
@@ -560,7 +602,8 @@ def test_cuda_fp16_overflow_does_not_advance_optimizer_or_warmup(prepared_data, 
 
 	model.head.weight.register_hook(overflow_once)
 	lrs = []
-	optimizer.register_step_pre_hook(lambda optimizer, args, kwargs: lrs.append(optimizer.param_groups[0]["lr"]))
+	optimizer.register_step_pre_hook(lambda optimizer, args, kwargs: None if _skipped_by_grad_scaler(optimizer)
+									 else lrs.append(optimizer.param_groups[0]["lr"]))
 	initial_state = TrainState()
 	run = start_run(model=model, optimizer=optimizer, config=config, state=initial_state,
 					train_loader=loaders[0], val_loader=loaders[1], repo_root=tmp_path,

@@ -50,6 +50,50 @@ def test_adamw_groups_cover_tied_weights_once_and_exclude_1d_decay(kda_config_fa
 			assert group["weight_decay"] == (0.1 if parameter.ndim >= 2 else 0)
 
 
+@pytest.mark.parametrize("weight_decay", [0.0, 0.1])
+def test_adam_fused_reaches_every_param_group(kda_config_factory, weight_decay):
+	model = KimiK3(kda_config_factory())
+
+	default = build_optimizer(model, TrainConfig(weight_decay=weight_decay))
+	unfused = build_optimizer(model, TrainConfig(weight_decay=weight_decay, adam_fused=False))
+
+	assert unfused.defaults["fused"] is False
+	assert default.defaults["fused"] is True
+	assert all(group["fused"] is True for group in default.param_groups)
+
+
+DEVICES = ["cpu", pytest.param(
+	"cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable"))]
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_fused_adamw_updates_match_the_default_implementation(kda_config_factory, device):
+	torch.manual_seed(0)
+	reference = KimiK3(kda_config_factory()).to(device)
+	fused = KimiK3(kda_config_factory()).to(device)
+	fused.load_state_dict(reference.state_dict())
+	config = TrainConfig(learning_rate=1e-2, weight_decay=0.1)
+	optimizers = [build_optimizer(reference, replace(config, adam_fused=False)), build_optimizer(fused, config)]
+	idx = torch.randint(0, reference.config.vocab_size, (2, 16), device=device)
+
+	for _ in range(3):
+		for model, optimizer in zip((reference, fused), optimizers):
+			optimizer.zero_grad(set_to_none=True)
+			_, loss = model(idx, targets=idx)
+			loss.backward()
+			optimizer.step()
+
+	for (name, expected), actual in zip(reference.state_dict().items(), fused.state_dict().values()):
+		torch.testing.assert_close(actual, expected, msg=name)
+
+
+def test_adam_fused_cli_flag_overrides_the_recipe():
+	base = ["--data-dir", "unused", "--smoke-test"]
+	assert build_train_config(parse_args(base)).adam_fused is True
+	assert build_train_config(parse_args(base + ["--adam-fused"])).adam_fused is True
+	assert build_train_config(parse_args(base + ["--no-adam-fused"])).adam_fused is False
+
+
 @pytest.mark.parametrize("name,steps,accumulation,overfit", [
 	("smoke", 20, 1, False), ("overfit", 2000, 1, True), ("stability", 1000, 4, False)])
 def test_preset_loads_shared_yaml_schema_and_cli_overrides(name, steps, accumulation, overfit):
@@ -76,6 +120,11 @@ def test_preset_loads_shared_yaml_schema_and_cli_overrides(name, steps, accumula
 def test_invalid_recipe_is_rejected(kwargs):
 	with pytest.raises(ValueError):
 		TrainConfig(**kwargs)
+
+
+def test_non_bool_adam_fused_is_rejected():
+	with pytest.raises(TypeError, match="adam_fused"):
+		TrainConfig(adam_fused="no")
 
 
 def test_fp16_cpu_is_rejected_before_running_training():
