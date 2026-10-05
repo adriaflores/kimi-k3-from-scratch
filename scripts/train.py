@@ -79,6 +79,7 @@ def parse_args(argv=None):
 	for name in ("learning_rate", "weight_decay", "adam_beta1", "adam_beta2", "adam_eps",
 				 "min_lr_ratio", "max_grad_norm"):
 		parser.add_argument("--" + name.replace("_", "-"), type=float)
+	parser.add_argument("--adam-fused", action=argparse.BooleanOptionalAction, default=None)
 	parser.add_argument("--precision", choices=("fp32", "bf16", "fp16"))
 	parser.add_argument("--lr-schedule", choices=("constant", "cosine"))
 	parser.add_argument("--run-dir", type=Path, help="Run folder; defaults to a unique folder under results/training/runs")
@@ -156,7 +157,7 @@ def main():
 	print(f"Device: {device} | parameters: {sum(p.numel() for p in model.parameters()):,}")
 	tokens_per_update = config.batch_size * config.seq_len * config.gradient_accumulation_steps
 	print(f"AdamW betas=({config.adam_beta1}, {config.adam_beta2}) | eps={config.adam_eps:g}"
-		  f" | weight_decay={config.weight_decay:g} | precision={config.precision}")
+		  f" | weight_decay={config.weight_decay:g} | precision={config.precision} | fused={config.adam_fused}")
 	print(f"microbatch={config.batch_size} x {config.seq_len}"
 		  f" | accumulation={config.gradient_accumulation_steps} | tokens/update={tokens_per_update:,}"
 		  f" | target updates={config.max_steps:,}"

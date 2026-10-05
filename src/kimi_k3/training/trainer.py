@@ -8,7 +8,7 @@ import math
 import os
 import random
 from contextlib import nullcontext
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -37,6 +37,7 @@ class TrainConfig:
 	adam_beta1: float = 0.9
 	adam_beta2: float = 0.95
 	adam_eps: float = 1e-8
+	adam_fused: bool = True
 	lr_schedule: str = "constant"
 	warmup_steps: int = 0
 	decay_steps: int = 1000
@@ -57,6 +58,8 @@ class TrainConfig:
 			raise ValueError("weight_decay must be finite and nonnegative")
 		if not isinstance(self.overfit_batch, bool):
 			raise TypeError("overfit_batch must be a bool")
+		if not isinstance(self.adam_fused, bool):
+			raise TypeError("adam_fused must be a bool")
 		if isinstance(self.warmup_steps, bool) or not isinstance(self.warmup_steps, int) or self.warmup_steps < 0:
 			raise ValueError("warmup_steps must be a nonnegative integer")
 		if isinstance(self.seed, bool) or not isinstance(self.seed, int) or not 0 <= self.seed < 2**32:
@@ -115,7 +118,8 @@ def build_optimizer(model, config: TrainConfig):
 		]
 		groups = [group for group in groups if group["params"]]
 	return torch.optim.AdamW(groups, lr=config.learning_rate, weight_decay=config.weight_decay,
-							 betas=(config.adam_beta1, config.adam_beta2), eps=config.adam_eps)
+							 betas=(config.adam_beta1, config.adam_beta2), eps=config.adam_eps,
+							 fused=config.adam_fused)
 
 
 def learning_rate_at_step(config: TrainConfig, step: int) -> float:
@@ -247,7 +251,7 @@ def save_checkpoint(path, model, optimizer, state: TrainState, config: TrainConf
 	path.parent.mkdir(parents=True, exist_ok=True)
 	temporary = path.with_name(path.name + ".tmp")
 	torch.save({
-		"format_version": 4,
+		"format_version": 5,
 		"model": model.state_dict(),
 		"optimizer": optimizer.state_dict(),
 		**asdict(state),
@@ -274,8 +278,8 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	"""
 	checkpoint = torch.load(path, map_location="cpu", weights_only=True)
 	version = checkpoint["format_version"]
-	if version not in (3, 4):
-		raise ValueError("Expected trainer checkpoint format_version=3 or 4; older checkpoints lack cursor/RNG state")
+	if version not in (3, 4, 5):
+		raise ValueError("Expected trainer checkpoint format_version=3, 4 or 5; older checkpoints lack cursor/RNG state")
 	state = TrainState(
 		step=checkpoint["step"], tokens_seen=checkpoint["tokens_seen"],
 		overfit_batch_start=checkpoint["overfit_batch_start"],
@@ -284,10 +288,15 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	)
 	# Validate structure before modifying model weights or optimizer state.
 	saved_config = checkpoint["train_config"]
-	legacy_defaults = TrainConfig()
+	# Checkpoints before version 5 were always trained with unfused AdamW.
+	legacy_defaults = replace(TrainConfig(), adam_fused=False)
 	for name in ("batch_size", "seq_len", "overfit_batch", "gradient_accumulation_steps",
-				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm"):
-		saved_value = saved_config[name] if version == 4 else saved_config.get(name, getattr(legacy_defaults, name))
+				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm", "adam_fused"):
+		# Version 4 predates adam_fused; version 3 predates the whole recipe.
+		if version == 5 or (version == 4 and name != "adam_fused"):
+			saved_value = saved_config[name]
+		else:
+			saved_value = saved_config.get(name, getattr(legacy_defaults, name))
 		if saved_value != getattr(config, name):
 			raise ValueError(f"Incompatible {name} in checkpoint")
 	if config.lr_schedule == "cosine":
@@ -327,7 +336,7 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	model.load_state_dict(checkpoint["model"])
 	optimizer.load_state_dict(checkpoint["optimizer"])
 	optimizer.zero_grad(set_to_none=True)
-	config.learning_rate = saved_config["learning_rate"] if version == 4 else optimizer.param_groups[0]["lr"]
+	config.learning_rate = saved_config["learning_rate"] if version >= 4 else optimizer.param_groups[0]["lr"]
 	config.weight_decay = saved_config["weight_decay"]
 	config.adam_beta1, config.adam_beta2 = optimizer.param_groups[0]["betas"]
 	config.adam_eps = optimizer.param_groups[0]["eps"]
