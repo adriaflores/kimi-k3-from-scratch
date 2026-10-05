@@ -46,8 +46,10 @@ def _route_on_leading_features(moe, x, logits):
 
 
 def _manual_expert(expert, z, beta, linear_beta):
-	g = z @ expert.gate.weight.T
-	u = z @ expert.up_proj.weight.T
+	# gate_up_proj stacks the gate rows first and the up rows second, matching SituGLU's chunk order.
+	gate_weight, up_weight = expert.gate_up_proj.weight.chunk(2, dim=0)
+	g = z @ gate_weight.T
+	u = z @ up_weight.T
 	activated = (beta * torch.tanh(g / beta) * torch.sigmoid(g)) * (linear_beta * torch.tanh(u / linear_beta))
 	return activated @ expert.down_proj.weight.T
 

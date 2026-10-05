@@ -67,7 +67,7 @@ def test_dense_ffn_backward_produces_finite_gradients(kda_config):
 
 	assert x.grad is not None
 	assert torch.isfinite(x.grad).all()
-	for name in ["gate.weight", "up_proj.weight", "down_proj.weight"]:
+	for name in ["gate_up_proj.weight", "down_proj.weight"]:
 		grad = dict(ffn.named_parameters())[name].grad
 		assert grad is not None, f"no gradient for {name}"
 		assert torch.isfinite(grad).all(), f"non-finite gradient for {name}"
@@ -100,7 +100,7 @@ def test_dense_ffn_matches_reference(kda_config):
 	x = torch.randn(2, 4, kda_config.hidden_size)
 
 	with torch.no_grad():
-		gate_up = torch.cat([x @ ffn.gate.weight.T, x @ ffn.up_proj.weight.T], dim=-1)
+		gate_up = x @ ffn.gate_up_proj.weight.T
 		activated = _reference_situ(gate_up, kda_config.situ_beta, kda_config.situ_linear_beta)
 		expected = activated @ ffn.down_proj.weight.T
 
