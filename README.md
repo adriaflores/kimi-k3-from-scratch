@@ -93,8 +93,10 @@ throughput in an unprofiled run with the same hardware and recipe.
 The presets use AdamW with peak LR `3e-4`, betas `(0.9, 0.95)`, epsilon `1e-8`
 and global L2 gradient clipping at `1.0`. Weight decay applies to matrices;
 1D norms, biases and gate parameters are excluded. Tied embeddings appear
-once in the optimizer. These are initial test settings, not tuned Kimi K3
-pretraining hyperparameters.
+once in the optimizer. AdamW uses PyTorch's fused kernel by default
+(`adam_fused: true`), which measured ~10% more tokens/s; `--no-adam-fused`
+selects the unfused implementation. These are initial test settings, not
+tuned Kimi K3 pretraining hyperparameters.
 For direct Python calls to `train`, a fresh optimizer's initial LR supplies
 the schedule's peak. The CLI constructs that optimizer from the recipe.
 
@@ -197,6 +199,8 @@ Version 3 still resumes with its original FP32, accumulation-one, constant-LR,
 no-warmup, clipping-disabled recipe and single AdamW group (use the bare CLI
 without a new training YAML or weight-decay override). This preserves its
 stored optimizer settings; it is not converted silently into a new recipe.
+Checkpoints before format version 5 were trained with unfused AdamW, so resume
+them with `--no-adam-fused`.
 
 Exact equivalence requires the same software, hardware and execution settings
 with deterministic kernels; PyTorch does not promise reproducibility across
