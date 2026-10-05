@@ -127,6 +127,16 @@ def test_incompatible_data_dimensions_are_rejected(vocab_size, seq_len, message)
 		build_model(vocab_size, seq_len, model_config_path=MODEL_CONFIG)
 
 
+def test_fused_kda_model_does_not_require_kda_chunk_alignment(tmp_path):
+	data = yaml.safe_load(MODEL_CONFIG.read_text(encoding="utf-8"))
+	data.update(kda_implementation="fused", kda_chunk_size=64)
+	path = tmp_path / "fused_kda.yaml"
+	path.write_text(yaml.safe_dump(data), encoding="utf-8")
+	with torch.device("meta"):
+		model = build_model(49152, 8, model_config_path=path)
+	assert type(model.layers[0].attn).__name__ == "FusedKDAChunkwise"
+
+
 def test_mla_only_model_does_not_require_kda_chunk_alignment(tmp_path):
 	data = yaml.safe_load(MODEL_CONFIG.read_text(encoding="utf-8"))
 	data["layer_types"] = ["mla"] * data["num_layers"]

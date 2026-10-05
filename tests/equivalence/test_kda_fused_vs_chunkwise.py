@@ -86,3 +86,61 @@ def test_fused_bf16_autocast_matches_chunkwise(kda_config_factory):
 
 	assert torch.isfinite(y_fused).all()
 	assert _rel_error(y_fused, y_reference) < BF16_RTOL
+
+
+def test_fused_handles_sequence_lengths_that_are_not_chunk_multiples(kda_config_factory):
+	config, _, fused = _make_pair(kda_config_factory, 64)
+	x = torch.randn(2, 2 * CHUNK_SIZE, config.hidden_size, device="cuda")
+	T = CHUNK_SIZE + 37
+
+	with torch.no_grad():
+		y_full = fused(x)
+		y_prefix = fused(x[:, :T])
+
+	# Causality: a padded partial chunk must give the same outputs as the full sequence.
+	assert _rel_error(y_prefix, y_full[:, :T]) < FP32_RTOL
+
+
+def test_fused_rejects_cpu_inputs(kda_config_factory):
+	config = kda_config_factory(kda_head_dim=64, kda_chunk_size=CHUNK_SIZE, kda_gate_lower_bound=-5.0)
+	fused = FusedKDAChunkwise(config)
+
+	with pytest.raises(RuntimeError, match="needs CUDA"):
+		fused(torch.randn(1, CHUNK_SIZE, config.hidden_size))
+
+
+def test_kimi_k3_with_fused_kda_matches_chunkwise(kda_config_factory):
+	from kimi_k3.model import KimiK3
+
+	overrides = dict(
+		hidden_size=64,
+		num_layers=2,
+		layer_types=("kda", "mla"),
+		# Dense FFNs only: MoE top-k routing could flip on ~1e-3 differences.
+		num_dense_layers=2,
+		attn_res_block_size=1,
+		max_seq_len=2 * CHUNK_SIZE,
+		kda_num_heads=2,
+		kda_head_dim=64,
+		kda_chunk_size=CHUNK_SIZE,
+		kda_gate_lower_bound=-5.0,
+	)
+	reference = KimiK3(kda_config_factory(kda_implementation="chunkwise", **overrides)).cuda()
+	fused = KimiK3(kda_config_factory(kda_implementation="fused", **overrides)).cuda()
+	fused.load_state_dict(reference.state_dict())
+	assert type(fused.layers[0].attn) is not type(reference.layers[0].attn)
+	idx = torch.randint(0, reference.config.vocab_size, (2, 2 * CHUNK_SIZE), device="cuda")
+
+	logits_reference, loss_reference = reference(idx, targets=idx)
+	logits_fused, loss_fused = fused(idx, targets=idx)
+	loss_reference.backward()
+	loss_fused.backward()
+
+	assert _rel_error(logits_fused, logits_reference) < FP32_RTOL
+	assert abs(loss_fused.item() - loss_reference.item()) < 1e-3
+	fused_params = dict(fused.named_parameters())
+	for name, p_reference in reference.named_parameters():
+		if p_reference.grad is None:
+			continue
+		rtol = A_LOG_GRAD_RTOL if name.endswith("A_log") else FP32_RTOL
+		assert _rel_error(fused_params[name].grad, p_reference.grad) < rtol, name
