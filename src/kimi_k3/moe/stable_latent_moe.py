@@ -58,7 +58,8 @@ class StableLatentMoE(nn.Module):
 				Expert(
 					hidden_size=self.latent_moe_dim,
 					intermediate_size=self.expert_intermediate_size,
-					situ=self.situ
+					situ=self.situ,
+					compile_situ=True
 				)
 				for _ in range(self.num_routed_experts)
 
