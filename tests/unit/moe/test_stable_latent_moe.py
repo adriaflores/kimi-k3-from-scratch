@@ -29,9 +29,12 @@ DISPATCH_LOGITS = torch.tensor([
 DISPATCH_SELECTION = [{0, 1}, {1, 2}, {2, 3}, {0, 3}]
 
 
-def _make_moe(kda_config_factory, **overrides):
+def _make_moe(kda_config_factory, *, naive_reference=False, **overrides):
 	config = kda_config_factory(**{**TINY_MOE, **overrides})
-	return config, StableLatentMoE(config)
+	moe = StableLatentMoE(config)
+	if naive_reference:
+		moe._forward_grouped_experts = moe._forward_naive_experts
+	return config, moe
 
 
 def _route_on_leading_features(moe, x, logits):
@@ -172,7 +175,7 @@ def test_forward_matches_manual_computation(kda_config_factory, renormalize, use
 
 def test_biases_change_selection_but_not_mixture_weights(kda_config_factory):
 	config, moe = _make_moe(
-		kda_config_factory, num_experts_per_token=1, moe_renormalize=False, latent_moe_use_norm=False,
+		kda_config_factory, naive_reference=True, num_experts_per_token=1, moe_renormalize=False, latent_moe_use_norm=False,
 		routed_scaling_factor=1.5,
 	)
 	logits = torch.tensor([[2.0, 1.0, 0.0, -1.0]]) # unbiased top-1 is expert 0
@@ -203,7 +206,8 @@ def test_biases_change_selection_but_not_mixture_weights(kda_config_factory):
 # Sparse dispatch and accumulation
 
 def test_each_expert_processes_only_its_assigned_tokens(kda_config_factory):
-	config, moe = _make_moe(kda_config_factory)
+	# Expert-module hooks illustrate the reference loop; grouped dispatch is covered by equivalence tests.
+	config, moe = _make_moe(kda_config_factory, naive_reference=True)
 	x = _route_on_leading_features(moe, torch.randn(1, 4, config.hidden_size), DISPATCH_LOGITS)
 
 	seen = {}
@@ -337,7 +341,7 @@ def test_output_shape(kda_config_factory, B, T):
 
 
 def test_bf16_output_dtype_with_fp32_router_scores(kda_config_factory, monkeypatch):
-	config, moe = _make_moe(kda_config_factory)
+	config, moe = _make_moe(kda_config_factory, expert_intermediate_size=16)
 	moe = moe.to(torch.bfloat16)
 	x = torch.randn(2, 5, config.hidden_size, dtype=torch.bfloat16)
 

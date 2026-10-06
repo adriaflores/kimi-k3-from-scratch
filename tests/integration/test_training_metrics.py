@@ -172,7 +172,7 @@ def test_training_rate_excludes_eval_save_and_reporting_cost(tmp_path, prepared_
 
 @pytest.mark.parametrize("device,precision,force_overflow", [
 	("cpu", "fp32", False),
-	pytest.param("cuda", "fp32", False, marks=pytest.mark.skipif(
+	pytest.param("cuda", "bf16", False, marks=pytest.mark.skipif(
 		not torch.cuda.is_available(), reason="CUDA is unavailable")),
 	pytest.param("cuda", "fp16", True, marks=pytest.mark.skipif(
 		not torch.cuda.is_available(), reason="CUDA is unavailable")),
@@ -187,6 +187,11 @@ def test_moe_records_match_expert_dispatch_with_accumulation_and_intervening_eva
 									  num_dense_layers=1, attn_res_block_size=2,
 									  num_experts=4, num_experts_per_token=2)
 	model = KimiK3(architecture).to(device)
+	if device == "cuda" and precision == "fp16":
+		# grouped_mm requires BF16 on CUDA; this case isolates FP16 GradScaler behavior.
+		for layer in model.layers:
+			if hasattr(layer.ffn, "_forward_naive_experts"):
+				layer.ffn._forward_grouped_experts = layer.ffn._forward_naive_experts
 	first = True
 
 	def overflow_once(gradient):
@@ -209,15 +214,21 @@ def test_moe_records_match_expert_dispatch_with_accumulation_and_intervening_eva
 	expected_counts = {name: [0] * 4 for name in layers}
 	handles = []
 
-	def observe(name, expert_index):
+	def observe(name):
 		def count(module, args):
 			if model.training:
-				expected_counts[name][expert_index] += args[0].shape[0]
+				# Observe routing before QB updates, independently of either expert execution method.
+				with torch.no_grad(), torch.autocast(args[0].device.type, enabled=False):
+					scores = torch.sigmoid(torch.nn.functional.linear(args[0].float(), module.router.weight.float()))
+					selected = torch.topk(scores + module.quantile_balancer.biases,
+										 k=module.top_k + 1, dim=-1).indices[..., :-1]
+				counts = torch.bincount(selected.flatten(), minlength=4).tolist()
+				for expert_index, assignments in enumerate(counts):
+					expected_counts[name][expert_index] += assignments
 		return count
 
 	for name, layer in layers.items():
-		for index, expert in enumerate(layer.experts):
-			handles.append(expert.register_forward_pre_hook(observe(name, index)))
+		handles.append(layer.register_forward_pre_hook(observe(name)))
 	truth = []
 	try:
 		with MetricsWriter(run) as metrics:

@@ -111,17 +111,33 @@ class StableLatentMoE(nn.Module):
 		counts = torch.bincount(expert_ids, minlength=self.num_routed_experts)
 		ends = torch.cumsum(counts, dim=0).tolist()
 
-		load_counts = self._expert_load_counts if self.training else None
-		routed_output = z.new_zeros(B*T, self.latent_moe_dim) # Match the autocast expert output dtype.
+		if self.training and self._expert_load_counts is not None:
+			start = 0
+			for expert_j, end in enumerate(ends):
+				self._expert_load_counts[expert_j] += end - start
+				start = end
+
+		routed_output = self._forward_grouped_experts(z, sorted_token_ids, sorted_weights, ends)
+
+		routed_output = routed_output.view(B, T, self.latent_moe_dim) # (B, T, D_latent)
+		if self.latent_moe_use_norm:
+			routed_output = self.post_router_rmsnorms(routed_output)
+		routed = self.up_latent_proj(routed_output) # (B, T, C)
+
+		output = shared + routed
+
+		return output
+
+
+	def _forward_naive_experts(self, z, sorted_token_ids, sorted_weights, ends):
+		# Readable reference for the paper's per-expert computation; forward uses grouped execution.
+		routed_output = z.new_zeros(z.shape)
 		start = 0
 		for expert_j in range(self.num_routed_experts):
 			end = ends[expert_j]
 			token_indices = sorted_token_ids[start:end] # (q_j)
 			expert_weights = sorted_weights[start:end].unsqueeze(-1) * self.routed_scaling_factor # (q_j, 1)
 			start = end
-
-			if load_counts is not None:
-				load_counts[expert_j] += token_indices.numel()
 
 			if token_indices.numel() == 0:
 				continue
@@ -133,11 +149,28 @@ class StableLatentMoE(nn.Module):
 
 			routed_output.index_add_(0, token_indices, expert_output)
 
-		routed_output = routed_output.view(B, T, self.latent_moe_dim) # (B, T, D_latent)
-		if self.latent_moe_use_norm:
-			routed_output = self.post_router_rmsnorms(routed_output)
-		routed = self.up_latent_proj(routed_output) # (B, T, C)
+		return routed_output
 
-		output = shared + routed
 
-		return output
+	def _forward_grouped_experts(self, z, sorted_token_ids, sorted_weights, ends):
+		# Empty experts stay outside the graph, preserving grad=None and sparse AdamW updates.
+		active_ids = [j for j, end in enumerate(ends) if end > (ends[j - 1] if j else 0)]
+		offsets = torch.tensor([ends[j] for j in active_ids], device=z.device, dtype=torch.int32)
+		z_sorted = z[sorted_token_ids] # (BTK, D_latent)
+
+		# grouped_mm does not autocast its operands; only the temporary stacks change dtype.
+		gate_up_weights = torch.stack([self.experts[j].gate_up_proj.weight for j in active_ids]).to(z.dtype)
+		gate_up = F.grouped_mm(z_sorted, gate_up_weights.transpose(-2, -1), offs=offsets)
+		if gate_up.is_cuda and self.training and torch.is_grad_enabled():
+			torch._dynamo.maybe_mark_dynamic(gate_up, 0)
+			activated = self.situ.compiled(gate_up)
+		else:
+			activated = self.situ(gate_up)
+
+		down_weights = torch.stack([self.experts[j].down_proj.weight for j in active_ids]).to(activated.dtype)
+		y_sorted = F.grouped_mm(activated, down_weights.transpose(-2, -1), offs=offsets)
+		expert_weights = (sorted_weights.unsqueeze(-1) * self.routed_scaling_factor).to(y_sorted.dtype)
+
+		routed_output = z.new_zeros(z.shape)
+		routed_output.index_add_(0, sorted_token_ids, y_sorted * expert_weights)
+		return routed_output

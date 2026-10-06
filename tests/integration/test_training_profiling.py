@@ -77,7 +77,8 @@ def test_real_profile_is_bounded_and_preserves_training_state(
 			torch.manual_seed(123)
 			config = TrainConfig(batch_size=1, seq_len=8, max_steps=6, log_interval=1,
 								 eval_interval=1, eval_batches=1, checkpoint_interval=1,
-								 gradient_accumulation_steps=2)
+								 gradient_accumulation_steps=2,
+								 precision="bf16" if device == "cuda" else "fp32")
 			model = KimiK3(_architecture(kda_config_factory)).to(device)
 			optimizer = build_optimizer(model, config)
 			loaders = [TokenDataLoader(ShardedTokenDataset(prepared_data, split), 1, 8)

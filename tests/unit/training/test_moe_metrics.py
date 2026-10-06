@@ -23,7 +23,9 @@ def test_loads_use_actual_biased_top_k_and_exclude_eval(kda_config_factory, moe_
 		moe.router.weight.zero_()
 		moe.router.weight[:, :4] = torch.eye(4, device=device)
 	keys = set(moe.state_dict())
-	with MoEDiagnostics(moe) as diagnostics, torch.no_grad():
+	with MoEDiagnostics(moe) as diagnostics, torch.no_grad(), torch.autocast(
+		device, dtype=torch.bfloat16, enabled=device == "cuda",
+	):
 		moe(x)  # Unbiased selections: {0,1}, {2,3}.
 		after_train = moe.quantile_balancer.biases.clone()
 		moe.eval()

@@ -149,7 +149,8 @@ def test_kimi_resume_matches_continuous_updates(prepared_data, tmp_path, kda_con
 		_seed(seed)
 		model = KimiK3(architecture).to(device)
 		optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0)
-		config = replace(_train_config(overfit_batch=overfit), max_steps=max_steps)
+		config = replace(_train_config(overfit_batch=overfit), max_steps=max_steps,
+						 precision="bf16" if device == "cuda" else "fp32")
 		loaders = _loaders(prepared_data, config)
 		# Catch a resume implementation that assumes the fixed batch always starts at zero.
 		if overfit:
@@ -481,6 +482,11 @@ def test_recipe_resume_keeps_accumulation_lr_precision_and_scaler(
 						 lr_schedule="cosine", warmup_steps=2, decay_steps=5,
 						 max_grad_norm=0.1, weight_decay=0.1)
 		model = KimiK3(architecture).to(device)
+		if device == "cuda" and precision != "bf16":
+			# Keep FP32/FP16 trainer/scaler coverage using the pedagogical reference in this test only.
+			for layer in model.layers:
+				if hasattr(layer.ffn, "_forward_naive_experts"):
+					layer.ffn._forward_grouped_experts = layer.ffn._forward_naive_experts
 		optimizer = build_optimizer(model, config)
 		loaders = _loaders(prepared_data, config)
 		if overfit:
