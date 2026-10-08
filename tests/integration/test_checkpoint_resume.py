@@ -19,6 +19,8 @@ from torch import nn
 from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
 from src.kimi_k3.model import KimiK3
 from src.kimi_k3.training.metrics import MetricsWriter
+from src.kimi_k3.training.optimizers import MuonAdamW
+from src.kimi_k3.training.parameter_groups import build_parameter_groups
 from src.kimi_k3.training.run import start_run
 from src.kimi_k3.training.trainer import (
 	TrainConfig,
@@ -362,7 +364,7 @@ def test_legacy_adamw_checkpoint_is_rejected_before_mutation(prepared_data, tmp_
 
 
 @pytest.mark.parametrize("case", ["layout_name", "missing_layout", "group_names", "group_indices",
-	"matrix_view", "momentum", "missing_recipe_field"])
+	"matrix_view", "momentum", "missing_recipe_field", "layout_splits", "group_splits", "missing_splits"])
 def test_hybrid_checkpoint_rejects_changed_assignment_before_mutation(
 	prepared_data, tmp_path, kda_config_factory, case,
 ):
@@ -386,6 +388,15 @@ def test_hybrid_checkpoint_rejects_changed_assignment_before_mutation(
 		group["muon_shape"] = (1, 24, 16)
 	elif case == "momentum":
 		group["momentum"] = 0.8
+	elif case in ("layout_splits", "group_splits", "missing_splits"):
+		if case == "layout_splits":
+			group = next(item for item in saved["optimizer_layout"] if "muon_split_sizes" in item)
+		else:
+			group = next(item for item in saved["optimizer"]["param_groups"] if "muon_split_sizes" in item)
+		if case == "missing_splits":
+			group.pop("muon_split_sizes")
+		else:
+			group["muon_split_sizes"] = (2, 6)  # Same total rows; different K/V boundary.
 	else:
 		saved["train_config"].pop("muon_ns_dtype")
 	torch.save(saved, path)
@@ -406,6 +417,48 @@ def test_hybrid_checkpoint_rejects_changed_assignment_before_mutation(
 	assert random.getstate() == rng_before[0]
 	np.testing.assert_equal(np.random.get_state(), rng_before[1])
 	_assert_equal(torch.get_rng_state(), rng_before[2])
+
+
+def test_deliverable_2_full_attention_checkpoint_cannot_resume_per_head_recipe(
+	prepared_data, tmp_path, kda_config_factory,
+):
+	config = replace(_train_config(), max_steps=1, weight_decay=0.1)
+	architecture = kda_config_factory(num_layers=2, layer_types=("kda", "mla"), num_dense_layers=1)
+	model = KimiK3(architecture)
+	# Reconstruct milestone 2's grouping: same tensors and algorithms, fused
+	# gate/up still split, but QKV/UQ/UKV are complete attention matrices.
+	assignment = {name: group for group in build_parameter_groups(model, config.weight_decay)
+		for name in group["param_names"]}
+	previous_groups = {}
+	for name, parameter in model.named_parameters():
+		group = assignment[name]
+		view = None if name.endswith(("QKV.weight", "W_UQ.weight", "W_UKV.weight")) else group.get("muon_shape")
+		key = (group["algorithm"], view, group["weight_decay"])
+		if key not in previous_groups:
+			previous_groups[key] = {"params": [], "param_names": [], "algorithm": group["algorithm"],
+				"weight_decay": group["weight_decay"]}
+			if view is not None:
+				previous_groups[key]["muon_shape"] = view
+		previous_groups[key]["params"].append(parameter)
+		previous_groups[key]["param_names"].append(name)
+	old_optimizer = MuonAdamW(list(previous_groups.values()), lr=config.learning_rate,
+		momentum=config.muon_momentum, ns_steps=config.muon_ns_steps)
+	path = tmp_path / "full_attention.pt"
+	train(model, old_optimizer, *_loaders(prepared_data, config), config, "cpu", checkpoint_path=path)
+	saved = torch.load(path, weights_only=True)
+	assert saved["format_version"] == 6
+	assert not any("muon_split_sizes" in group for group in saved["optimizer_layout"])
+	assert saved["optimizer"]["state"]
+	target = KimiK3(architecture)
+	optimizer = build_optimizer(target, config)
+	loaders = _loaders(prepared_data, config)
+	before = copy.deepcopy(target.state_dict())
+	with pytest.raises(ValueError, match="Incompatible optimizer.*start a new run"):
+		load_checkpoint(path, target, optimizer, config, vocab_size=32,
+			train_loader=loaders[0], val_loader=loaders[1])
+	_assert_equal(target.state_dict(), before)
+	assert not optimizer.state
+	assert all(loader.position == 0 for loader in loaders)
 
 
 def test_hybrid_resume_restores_all_hyperparameters_even_after_zero_decay_build(
@@ -439,7 +492,8 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 														  kda_config_factory, overfit, use_recipe):
 	architecture = kda_config_factory(num_layers=4, layer_types=("kda", "kda", "kda", "mla"),
 									 num_dense_layers=1, attn_res_block_size=2,
-									 num_experts=4, num_experts_per_token=2)
+									 num_experts=4, num_experts_per_token=2,
+									 mla_qk_nope_head_dim=3, mla_v_head_dim=5)
 	path = tmp_path / "model.yaml"
 	path.write_text(yaml.safe_dump(asdict(architecture)), encoding="utf-8")
 	recipe_path = tmp_path / "train.yaml"
@@ -541,7 +595,8 @@ def test_recipe_resume_keeps_accumulation_lr_precision_and_scaler(
 ):
 	architecture = kda_config_factory(num_layers=4, layer_types=("kda", "kda", "kda", "mla"),
 									 num_dense_layers=1, attn_res_block_size=2,
-									 num_experts=4, num_experts_per_token=2)
+									 num_experts=4, num_experts_per_token=2,
+									 mla_qk_nope_head_dim=3, mla_v_head_dim=5)
 
 	def construct(seed, max_steps):
 		_seed(seed)

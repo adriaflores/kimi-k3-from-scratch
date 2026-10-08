@@ -220,8 +220,13 @@ def _optimizer_layout(model, optimizer) -> list[dict]:
 		if "param_names" in group and group["param_names"] != [item["name"] for item in parameters]:
 			raise ValueError("Optimizer param_names do not match model parameters")
 		view = group.get("muon_shape")
-		layout.append({"algorithm": group.get("algorithm"),
-			"muon_shape": None if view is None else tuple(view), "parameters": parameters})
+		description = {"algorithm": group.get("algorithm"),
+			"muon_shape": None if view is None else tuple(view), "parameters": parameters}
+		# Omit absent row splits so format-6 checkpoints without attention
+		# (e.g. the smoke model) keep their existing layout representation.
+		if group.get("muon_split_sizes") is not None:
+			description["muon_split_sizes"] = tuple(group["muon_split_sizes"])
+		layout.append(description)
 	return layout
 
 
@@ -342,16 +347,18 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 		len(saved["params"]) != len(current["params"])
 		for saved, current in zip(groups, optimizer.param_groups)
 	):
-		raise ValueError("Incompatible optimizer parameter groups")
+		raise ValueError("Incompatible optimizer parameter groups; start a new run")
 	layout = _optimizer_layout(model, optimizer)
 	if checkpoint.get("optimizer_layout") != layout:
-		raise ValueError("Incompatible optimizer parameter layout (names, shapes, dtype or matrix views)")
+		raise ValueError("Incompatible optimizer parameter layout (names, shapes, dtype or matrix views); start a new run")
 	current_groups = optimizer.state_dict()["param_groups"]
 	for saved, current, description in zip(groups, current_groups, layout):
 		view = saved.get("muon_shape")
+		splits = saved.get("muon_split_sizes")
 		if (saved["params"] != current["params"]
 				or saved.get("algorithm") != description["algorithm"]
 				or (None if view is None else tuple(view)) != description["muon_shape"]
+				or (None if splits is None else tuple(splits)) != description.get("muon_split_sizes")
 				or ("param_names" in current and saved.get("param_names") != current["param_names"])):
 			raise ValueError("Incompatible optimizer parameter layout in saved groups")
 	if isinstance(optimizer, MuonAdamW):
@@ -366,7 +373,7 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 				expected.update(betas=(saved_config["adam_beta1"], saved_config["adam_beta2"]),
 					eps=saved_config["adam_eps"], fused=saved_config["adam_fused"])
 			if any(saved[key] != value for key, value in expected.items()
-					if key not in ("params", "param_names", "muon_shape")):
+					if key not in ("params", "param_names", "muon_shape", "muon_split_sizes")):
 				raise ValueError("Optimizer hyperparameters differ from the saved training recipe")
 	train_position = train_loader.validate_state_dict(checkpoint["loaders"]["train"])
 	val_loader.validate_state_dict(checkpoint["loaders"]["val"])

@@ -6,7 +6,7 @@ than the original Muon learning-rate convention. Upstream MIT notices and
 pinned source revisions are in references/muon/NOTICE.md.
 
 This module requires explicit parameter groups. Model-specific assignment is
-in parameter_groups.py; per-head attention and weight clipping are later stages.
+in parameter_groups.py; weight clipping is a later stage.
 """
 
 import math
@@ -94,6 +94,10 @@ class MuonAdamW(torch.optim.Optimizer):
 	a view of independent matrices, e.g. ``(2, intermediate, hidden)`` for fused
 	FFN gate/up. Its product must match each parameter's size. Matrix dimensions
 	for RMS scaling are those of the view, rather than the fused storage shape.
+	``muon_split_sizes`` optionally partitions the view's row axis (-2), e.g.
+	``(key_dim, value_dim)`` for MLA's interleaved K/V rows within each head.
+	Each part has independent normalization, NS iterations and shape scaling;
+	momentum and decay still belong to the original parameter exactly once.
 	"""
 
 	def __init__(self, param_groups: Iterable[dict], *, lr=3e-4,
@@ -128,7 +132,13 @@ class MuonAdamW(torch.optim.Optimizer):
 			if view is not None and (not isinstance(view, (tuple, list)) or len(view) < 2
 					or any(isinstance(size, bool) or not isinstance(size, int) or size < 1 for size in view)):
 				raise ValueError("muon_shape must contain at least two positive integer dimensions")
+			splits = group.get("muon_split_sizes")
+			if splits is not None and (not isinstance(splits, (tuple, list)) or len(splits) < 2
+					or any(isinstance(size, bool) or not isinstance(size, int) or size < 1 for size in splits)):
+				raise ValueError("muon_split_sizes must contain at least two positive integer row sizes")
 		else:
+			if group.get("muon_shape") is not None or group.get("muon_split_sizes") is not None:
+				raise ValueError("Muon matrix views are only supported in Muon groups")
 			betas = group["betas"]
 			if not isinstance(betas, (tuple, list)) or len(betas) != 2:
 				raise ValueError("betas must contain two values in [0, 1)")
@@ -155,6 +165,9 @@ class MuonAdamW(torch.optim.Optimizer):
 			if (algorithm == "muon" and group.get("muon_shape") is not None
 					and math.prod(group["muon_shape"]) != parameter.numel()):
 				raise ValueError("muon_shape must match each parameter's number of elements")
+			if (algorithm == "muon" and group.get("muon_split_sizes") is not None
+					and sum(group["muon_split_sizes"]) != (group.get("muon_shape") or parameter.shape)[-2]):
+				raise ValueError("muon_split_sizes must sum to the Muon view's row dimension")
 
 	def add_param_group(self, param_group):
 		"""Preserve input ordering and reject duplicates, including within a group."""
@@ -194,6 +207,10 @@ class MuonAdamW(torch.optim.Optimizer):
 			if len(previous["params"]) != len(current["params"]):
 				raise ValueError("Incompatible optimizer parameter-group sizes")
 			self._validate_group({**previous, "params": current["params"]})
+			for key in ("muon_shape", "muon_split_sizes"):
+				old, new = previous.get(key), current.get(key)
+				if (None if old is None else tuple(old)) != (None if new is None else tuple(new)):
+					raise ValueError(f"Incompatible optimizer matrix views ({key})")
 		super().load_state_dict(state_dict)
 		self._bind_adamw()
 
@@ -222,8 +239,19 @@ class MuonAdamW(torch.optim.Optimizer):
 				buffer.mul_(group["momentum"]).add_(gradient)
 				update = gradient.add(buffer, alpha=group["momentum"]) if group["nesterov"] else buffer
 				shape = group.get("muon_shape") or parameter.shape
-				update = zeropower_via_newton_schulz(update.reshape(shape), steps=group["ns_steps"], dtype=group["ns_dtype"])
-				scale = 0.2 * math.sqrt(max(shape[-2:]))
+				update = update.reshape(shape)
+				splits = group.get("muon_split_sizes")
+				if splits is None:
+					update = zeropower_via_newton_schulz(update, steps=group["ns_steps"], dtype=group["ns_dtype"])
+					scale = 0.2 * math.sqrt(max(shape[-2:]))
+				else:
+					# Copy NS results into parameter precision before scaling. This
+					# also avoids updating a reshape copy of noncontiguous storage.
+					assembled = torch.empty(shape, dtype=parameter.dtype, device=parameter.device)
+					for part, destination in zip(update.split(splits, dim=-2), assembled.split(splits, dim=-2)):
+						destination.copy_(zeropower_via_newton_schulz(part, steps=group["ns_steps"], dtype=group["ns_dtype"]))
+						destination.mul_(0.2 * math.sqrt(max(part.shape[-2:])))
+					update, scale = assembled, 1.0
 				parameter.mul_(1 - group["lr"] * group["weight_decay"])
 				parameter.add_(update.reshape(parameter.shape), alpha=-group["lr"] * scale)
 		if self._adamw is not None:

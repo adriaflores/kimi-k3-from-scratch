@@ -63,6 +63,11 @@ def test_run_records_provenance_without_changing_training_state(run_arguments):
 	assert all(group["ns_dtype"] == "torch.bfloat16" for group in groups if group["algorithm"] == "muon")
 	assert sum(group["element_count"] for group in groups) == session["parameter_count"]
 	assert sum(group["parameter_count"] for group in groups) == len(list(model.parameters()))
+	ukv = next(group for group in groups if "layers.1.attn.W_UKV.weight" in group["param_names"])
+	assert ukv["muon_shape"] == [2, 8, 8]
+	assert ukv["muon_split_sizes"] == [4, 4]
+	layout = session["optimizer"]["layout"]
+	assert next(group for group in layout if "muon_split_sizes" in group)["muon_split_sizes"] == [4, 4]
 	assert session["environment"]["torch"] == str(torch.__version__)
 	assert session["environment"]["hardware"]["device"] == "cpu"
 	assert session["environment"]["hardware"]["gpu"] is None

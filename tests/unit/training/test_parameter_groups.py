@@ -37,9 +37,17 @@ def test_every_backbone_family_has_the_declared_algorithm(kda_config_factory, fu
 			assert (group["algorithm"], group["weight_decay"]) == ("adamw", 0.0), name
 		else:
 			assert (group["algorithm"], group["weight_decay"]) == ("muon", 0.1), name
-	# Deliverable 2 intentionally retains full attention matrices.
-	for name in ("layers.0.attn.QKV.weight", "layers.1.attn.W_UQ.weight", "layers.1.attn.W_UKV.weight"):
+	kda, mla = model.layers[0].attn, model.layers[1].attn
+	assert assignment["layers.0.attn.QKV.weight"]["muon_shape"] == (3, kda.num_heads, kda.d_head, kda.d_model)
+	assert assignment["layers.1.attn.W_UQ.weight"]["muon_shape"] == (mla.num_heads, mla.d_head + mla.d_shared, mla.q_latent_dim)
+	assert assignment["layers.1.attn.W_UKV.weight"]["muon_shape"] == (mla.num_heads, mla.d_head + mla.dv_head, mla.kv_latent_dim)
+	assert assignment["layers.1.attn.W_UKV.weight"]["muon_split_sizes"] == (mla.d_head, mla.dv_head)
+	for name in ("layers.0.attn.Wo.weight", "layers.0.attn.Wb.weight", "layers.0.attn.Wad.weight",
+		"layers.0.attn.Wau.weight", "layers.1.attn.Wo.weight", "layers.1.attn.W_DQ.weight", "layers.1.attn.W_DKV.weight"):
 		assert assignment[name].get("muon_shape") is None
+	for name, group in assignment.items():
+		if name.endswith(("Wg.weight", "Wgd.weight", "Wgu.weight")):
+			assert group.get("muon_shape") is None
 	for module_name, module in model.named_modules():
 		if isinstance(module, DenseFFN):
 			assert assignment[module_name + ".gate_up_proj.weight"]["muon_shape"] == (
@@ -152,3 +160,14 @@ def test_shipped_300m_assigns_all_weights_without_allocating_optimizer_state(imp
 	assert sum(parameter.numel() for group in optimizer.param_groups for parameter in group["params"]) == sum(
 		parameter.numel() for parameter in model.parameters())
 	assert {group["algorithm"] for group in optimizer.param_groups} == {"muon", "adamw"}
+	assignment = {name: group for group in optimizer.param_groups for name in group["param_names"]}
+	for index, layer in enumerate(model.layers):
+		prefix = f"layers.{index}.attn."
+		if config.layer_types[index] == "kda":
+			assert assignment[prefix + "QKV.weight"]["muon_shape"] == (
+				3, config.kda_num_heads, config.kda_head_dim, config.hidden_size)
+		else:
+			assert assignment[prefix + "W_UQ.weight"]["muon_shape"] == (
+				config.mla_num_heads, config.mla_qk_nope_head_dim + config.mla_qk_shared_head_dim, config.mla_q_lora_rank)
+			assert assignment[prefix + "W_UKV.weight"]["muon_split_sizes"] == (
+				config.mla_qk_nope_head_dim, config.mla_v_head_dim)

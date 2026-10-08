@@ -97,6 +97,10 @@ depthwise short-convolution filters use AdamW. Tied weights appear once. Norms,
 biases and logical vectors have no weight decay; matrices and convolution
 filters use the configured decay. Fused FFN gate/up storage is viewed as two
 independent matrices, each with its own Newton–Schulz normalization and scaling.
+Attention Q/K/V projections also use independent head blocks: KDA's fused
+`QKV`, MLA's `W_UQ`, and the separate K and V rows of each head in `W_UKV`.
+MLA supports unequal key/value dimensions. Its shared latent down-projections,
+attention output projections and matrix gates retain whole-matrix Muon.
 
 Muon uses Nesterov momentum `0.95`, five Newton–Schulz iterations in BF16, and
 Moonlight's `0.2 * sqrt(max(rows, columns))` update scale. Both algorithms share
@@ -107,9 +111,9 @@ execution backend. `muon_momentum`, `muon_ns_steps` and `muon_ns_dtype` also hav
 CLI overrides; FP32/FP64 NS arithmetic is available for numerical checks.
 These are local test settings, not tuned Kimi K3 pretraining hyperparameters.
 
-This is **deliverable 2**: attention projections are still full matrices.
-Per-head attention assignment and attention weight clipping remain separate
-upcoming deliverables. See [the assignment and integration contract](docs/notes/muon_training_integration.md).
+This is **deliverable 3**: per-head attention assignment is active in the fixed
+recipe. Attention weight clipping remains the next deliverable. See
+[the head geometry and checkpoint contract](docs/notes/muon_per_head_attention.md).
 
 For direct Python calls to `train`, a fresh optimizer's initial LR supplies
 the schedule's peak. The CLI constructs that optimizer from the recipe.
@@ -171,7 +175,8 @@ defaults; it uses the same hybrid optimizer. The preset YAMLs enable the recipe 
 New checkpoints use trainer format version 6 and are written atomically after a
 completed optimizer update, with no pending gradients. They contain model
 parameters and persistent buffers (including Quantile Balancing biases), Muon
-momentum and native AdamW state and hyperparameters, step/token/skip counters, GradScaler state for FP16,
+momentum and native AdamW state and hyperparameters, named parameter layouts
+with head geometry and K/V row splits, step/token/skip counters, GradScaler state for FP16,
 the training recipe, both data-loader cursors, and Python, NumPy, PyTorch CPU
 and active-device CUDA RNG states. In overfit mode,
 the fixed batch's starting token offset is saved so resume rereads those same
@@ -210,6 +215,8 @@ Prepared shards must remain unchanged: manifest identity includes their
 recorded checksums, but startup does not hash entire shard files. The data
 directory can move if its manifest and files are identical. Legacy AdamW trainer
 checkpoints (versions 3–5) cannot resume this Muon recipe; start a new run.
+Deliverable 2's full-attention Muon checkpoints also have incompatible matrix
+views/grouping, even though both stages use format 6; start a new run for this stage.
 Earlier checkpoints also lack the required state. The loader rejects them before
 changing model weights, optimizer state, data cursors or RNG.
 
