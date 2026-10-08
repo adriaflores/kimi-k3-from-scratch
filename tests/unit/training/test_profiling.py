@@ -1,12 +1,17 @@
 import gzip
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 import torch
 from torch import nn
 
-from src.kimi_k3.training.profiling import ProfileConfig, TrainingProfiler
+from src.kimi_k3.training.profiling import (
+	ProfileConfig,
+	TrainingProfiler,
+	_compress_trace,
+)
 from src.kimi_k3.training.trainer import TrainState
 
 
@@ -59,8 +64,67 @@ def test_partial_trace_and_hooks_are_closed_when_forward_raises(tmp_path):
 		trace = json.load(stream)
 	names = {event.get("name") for event in trace["traceEvents"]}
 	assert "model/ExplodingAttention" in names and "train/forward" in names
+	assert not (directory / "trace.json").exists()
 
 
 def test_profile_requires_a_destination_without_metrics():
 	with pytest.raises(ValueError, match="profile_dir"):
 		TrainingProfiler(nn.Linear(2, 2), "cpu", TrainState(), ProfileConfig())
+
+
+def _limit_trace_reads(monkeypatch, raw, *, fail_after=None):
+	"""Simulate a reader that cannot allocate fresh large bytes objects."""
+	original_open = Path.open
+	buffers = []
+
+	class ConstrainedReader:
+		def __init__(self, source):
+			self.source = source
+		def __enter__(self):
+			self.source.__enter__()
+			return self
+		def __exit__(self, *args):
+			return self.source.__exit__(*args)
+		def read(self, _size=-1):
+			raise MemoryError("Cannot allocate a new trace read buffer")
+		def readinto(self, buffer):
+			if len(buffer) > 64 * 1024:
+				raise MemoryError("Trace buffer exceeds the available memory")
+			if fail_after is not None and len(buffers) >= fail_after:
+				raise MemoryError("Trace read failed after compression started")
+			buffers.append(id(buffer))
+			return self.source.readinto(buffer)
+
+	def constrained_open(path, mode="r", *args, **kwargs):
+		source = original_open(path, mode, *args, **kwargs)
+		return ConstrainedReader(source) if path == raw and mode == "rb" else source
+
+	monkeypatch.setattr(Path, "open", constrained_open)
+	return buffers
+
+
+def test_trace_compression_reuses_a_small_buffer_under_read_memory_pressure(tmp_path, monkeypatch):
+	raw, compressed = tmp_path / "trace.json", tmp_path / "trace.json.gz"
+	# Multiple full blocks and a short last block catch truncation and stale bytes.
+	payload = bytes(range(256)) * 8192 + b"short final block"
+	raw.write_bytes(payload)
+	buffers = _limit_trace_reads(monkeypatch, raw)
+	_compress_trace(raw, compressed)
+	with gzip.open(compressed, "rb") as source:
+		assert source.read() == payload
+	assert len(buffers) > 2 and len(set(buffers)) == 1
+	assert not compressed.with_name(compressed.name + ".tmp").exists()
+
+
+def test_failed_trace_compression_preserves_raw_and_previous_archive(tmp_path, monkeypatch):
+	raw, compressed = tmp_path / "trace.json", tmp_path / "trace.json.gz"
+	payload = b"trace data" * 20000
+	raw.write_bytes(payload)
+	previous = gzip.compress(b"previous complete trace")
+	compressed.write_bytes(previous)
+	with monkeypatch.context() as limited:
+		_limit_trace_reads(limited, raw, fail_after=1)
+		with pytest.raises(MemoryError, match="after compression started"):
+			_compress_trace(raw, compressed)
+	assert raw.read_bytes() == payload and compressed.read_bytes() == previous
+	assert not compressed.with_name(compressed.name + ".tmp").exists()

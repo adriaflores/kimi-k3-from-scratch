@@ -2,12 +2,25 @@
 
 import gzip
 import json
-import shutil
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import torch
+
+
+def _compress_trace(raw, compressed):
+	"""Stream the trace through one small reusable buffer, then publish it."""
+	temporary = compressed.with_name(compressed.name + ".tmp")
+	buffer = bytearray(64 * 1024)
+	view = memoryview(buffer)
+	try:
+		with raw.open("rb", buffering=0) as source, gzip.open(temporary, "wb", compresslevel=1) as target:
+			while count := source.readinto(buffer):
+				target.write(view[:count])
+		temporary.replace(compressed)
+	finally:
+		temporary.unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)
@@ -91,7 +104,9 @@ class TrainingProfiler:
 			schedule=torch.profiler.schedule(**asdict(self.config), repeat=1),
 			on_trace_ready=self._export,
 			profile_memory=True, record_shapes=False, with_stack=False,
-			acc_events=True,
+			# repeat=1 captures one cycle. Defer Python event-tree construction
+			# until key_averages(), after the raw trace has been compressed.
+			acc_events=False,
 		)
 		self._prof.preset_metadata_json("training_profile", json.dumps({
 			"run_id": self.run_id, "session_id": self.session_id,
@@ -155,8 +170,7 @@ class TrainingProfiler:
 		prof.export_chrome_trace(str(raw))
 		# Export to a closed path first: reopening an open NamedTemporaryFile
 		# for native trace writing is not portable to Windows.
-		with raw.open("rb") as source, gzip.open(self.directory / "trace.json.gz", "wb", compresslevel=1) as target:
-			shutil.copyfileobj(source, target, length=1024 * 1024)
+		_compress_trace(raw, self.directory / "trace.json.gz")
 		raw.unlink()
 		averages = prof.key_averages()
 		self.cuda_timings = any(event.device_time_total > 0 for event in averages)
