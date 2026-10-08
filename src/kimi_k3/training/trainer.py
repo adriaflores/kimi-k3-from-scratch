@@ -8,7 +8,7 @@ import math
 import os
 import random
 from contextlib import nullcontext
-from dataclasses import asdict, dataclass, is_dataclass, replace
+from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +17,8 @@ import torch
 from .metrics import TrainingWindow
 from .moe_metrics import MoEDiagnostics
 from .monitoring import TrainingMonitor
+from .optimizers import MuonAdamW
+from .parameter_groups import build_parameter_groups
 from .profiling import TrainingProfiler
 
 
@@ -38,6 +40,9 @@ class TrainConfig:
 	adam_beta2: float = 0.95
 	adam_eps: float = 1e-8
 	adam_fused: bool = True
+	muon_momentum: float = 0.95
+	muon_ns_steps: int = 5
+	muon_ns_dtype: str = "bf16"
 	lr_schedule: str = "constant"
 	warmup_steps: int = 0
 	decay_steps: int = 1000
@@ -60,6 +65,12 @@ class TrainConfig:
 			raise TypeError("overfit_batch must be a bool")
 		if not isinstance(self.adam_fused, bool):
 			raise TypeError("adam_fused must be a bool")
+		if isinstance(self.muon_momentum, bool) or not math.isfinite(self.muon_momentum) or not 0 <= self.muon_momentum < 1:
+			raise ValueError("muon_momentum must be finite and in [0, 1)")
+		if isinstance(self.muon_ns_steps, bool) or not isinstance(self.muon_ns_steps, int) or self.muon_ns_steps < 1:
+			raise ValueError("muon_ns_steps must be a positive integer")
+		if self.muon_ns_dtype not in ("bf16", "fp32", "fp64"):
+			raise ValueError("muon_ns_dtype must be bf16, fp32 or fp64")
 		if isinstance(self.warmup_steps, bool) or not isinstance(self.warmup_steps, int) or self.warmup_steps < 0:
 			raise ValueError("warmup_steps must be a nonnegative integer")
 		if isinstance(self.seed, bool) or not isinstance(self.seed, int) or not 0 <= self.seed < 2**32:
@@ -104,22 +115,14 @@ class TrainState:
 
 
 def build_optimizer(model, config: TrainConfig):
-	"""AdamW: decay matrices; exclude 1D biases, norms and gate parameters.
-
-	With zero weight decay a single group preserves the original v3 layout.
-	model.parameters() deduplicates tied embedding/head weights.
-	"""
-	parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
-	groups = parameters
-	if config.weight_decay:
-		groups = [
-			{"params": [p for p in parameters if p.ndim >= 2], "weight_decay": config.weight_decay},
-			{"params": [p for p in parameters if p.ndim < 2], "weight_decay": 0.0},
-		]
-		groups = [group for group in groups if group["params"]]
-	return torch.optim.AdamW(groups, lr=config.learning_rate, weight_decay=config.weight_decay,
-							 betas=(config.adam_beta1, config.adam_beta2), eps=config.adam_eps,
-							 fused=config.adam_fused)
+	"""The only CLI recipe: Muon hidden matrices plus native auxiliary AdamW."""
+	config.__post_init__()
+	return MuonAdamW(build_parameter_groups(model, config.weight_decay),
+		lr=config.learning_rate, weight_decay=config.weight_decay,
+		momentum=config.muon_momentum, nesterov=True, ns_steps=config.muon_ns_steps,
+		ns_dtype={"bf16": torch.bfloat16, "fp32": torch.float32, "fp64": torch.float64}[config.muon_ns_dtype],
+		betas=(config.adam_beta1, config.adam_beta2), eps=config.adam_eps,
+		adamw_fused=config.adam_fused)
 
 
 def learning_rate_at_step(config: TrainConfig, step: int) -> float:
@@ -207,6 +210,21 @@ def _runtime_signature(model) -> dict:
 	}
 
 
+def _optimizer_layout(model, optimizer) -> list[dict]:
+	"""Canonical names and matrix views; group lengths alone cannot detect swaps."""
+	names = {id(parameter): name for name, parameter in model.named_parameters()}
+	layout = []
+	for group in optimizer.param_groups:
+		parameters = [{"name": names[id(parameter)], "shape": tuple(parameter.shape),
+					   "dtype": str(parameter.dtype)} for parameter in group["params"]]
+		if "param_names" in group and group["param_names"] != [item["name"] for item in parameters]:
+			raise ValueError("Optimizer param_names do not match model parameters")
+		view = group.get("muon_shape")
+		layout.append({"algorithm": group.get("algorithm"),
+			"muon_shape": None if view is None else tuple(view), "parameters": parameters})
+	return layout
+
+
 @torch.no_grad()
 def evaluate(model, loader, device, max_batches: int, *, precision: str = "fp32") -> float:
 	"""Mean token loss on a fixed validation prefix, without repeating data."""
@@ -251,7 +269,7 @@ def save_checkpoint(path, model, optimizer, state: TrainState, config: TrainConf
 	path.parent.mkdir(parents=True, exist_ok=True)
 	temporary = path.with_name(path.name + ".tmp")
 	torch.save({
-		"format_version": 5,
+		"format_version": 6,
 		"model": model.state_dict(),
 		"optimizer": optimizer.state_dict(),
 		**asdict(state),
@@ -259,6 +277,7 @@ def save_checkpoint(path, model, optimizer, state: TrainState, config: TrainConf
 		"vocab_size": vocab_size,
 		"model_config": _model_config(model),
 		"optimizer_type": f"{type(optimizer).__module__}.{type(optimizer).__qualname__}",
+		"optimizer_layout": _optimizer_layout(model, optimizer),
 		"loaders": {"train": train_loader.state_dict(), "val": val_loader.state_dict()},
 		"rng_state": _capture_rng_state(device),
 		"runtime": _runtime_signature(model),
@@ -274,12 +293,14 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	Optimizer hyperparameters (including LR) are restored from the checkpoint.
 	RNG is restored last, after model/optimizer construction and state loading.
 	Continue on the same data, software and device with deterministic kernels
-	for bitwise equivalence. Version 3 supports only its original FP32 recipe.
+	for bitwise equivalence. Legacy AdamW checkpoints cannot resume Muon.
 	"""
 	checkpoint = torch.load(path, map_location="cpu", weights_only=True)
 	version = checkpoint["format_version"]
-	if version not in (3, 4, 5):
-		raise ValueError("Expected trainer checkpoint format_version=3, 4 or 5; older checkpoints lack cursor/RNG state")
+	if version in (3, 4, 5):
+		raise ValueError("Legacy AdamW checkpoints cannot resume the Muon recipe; start a new run")
+	if version != 6:
+		raise ValueError("Expected trainer checkpoint format_version=6")
 	state = TrainState(
 		step=checkpoint["step"], tokens_seen=checkpoint["tokens_seen"],
 		overfit_batch_start=checkpoint["overfit_batch_start"],
@@ -288,16 +309,15 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	)
 	# Validate structure before modifying model weights or optimizer state.
 	saved_config = checkpoint["train_config"]
-	# Checkpoints before version 5 were always trained with unfused AdamW.
-	legacy_defaults = replace(TrainConfig(), adam_fused=False)
+	if not isinstance(saved_config, dict) or saved_config.keys() != asdict(config).keys():
+		raise ValueError("Incomplete or unknown training recipe fields in checkpoint")
+	try:
+		TrainConfig(**saved_config)
+	except (TypeError, ValueError) as error:
+		raise ValueError("Invalid training recipe in checkpoint") from error
 	for name in ("batch_size", "seq_len", "overfit_batch", "gradient_accumulation_steps",
-				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm", "adam_fused"):
-		# Version 4 predates adam_fused; version 3 predates the whole recipe.
-		if version == 5 or (version == 4 and name != "adam_fused"):
-			saved_value = saved_config[name]
-		else:
-			saved_value = saved_config.get(name, getattr(legacy_defaults, name))
-		if saved_value != getattr(config, name):
+				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm", "adam_fused", "muon_ns_dtype"):
+		if saved_config[name] != getattr(config, name):
 			raise ValueError(f"Incompatible {name} in checkpoint")
 	if config.lr_schedule == "cosine":
 		for name in ("decay_steps", "min_lr_ratio"):
@@ -322,7 +342,32 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 		len(saved["params"]) != len(current["params"])
 		for saved, current in zip(groups, optimizer.param_groups)
 	):
-		raise ValueError("Incompatible optimizer parameter groups (v3 requires the original single group)")
+		raise ValueError("Incompatible optimizer parameter groups")
+	layout = _optimizer_layout(model, optimizer)
+	if checkpoint.get("optimizer_layout") != layout:
+		raise ValueError("Incompatible optimizer parameter layout (names, shapes, dtype or matrix views)")
+	current_groups = optimizer.state_dict()["param_groups"]
+	for saved, current, description in zip(groups, current_groups, layout):
+		view = saved.get("muon_shape")
+		if (saved["params"] != current["params"]
+				or saved.get("algorithm") != description["algorithm"]
+				or (None if view is None else tuple(view)) != description["muon_shape"]
+				or ("param_names" in current and saved.get("param_names") != current["param_names"])):
+			raise ValueError("Incompatible optimizer parameter layout in saved groups")
+	if isinstance(optimizer, MuonAdamW):
+		expected_groups = build_parameter_groups(model, saved_config["weight_decay"])
+		for saved, expected in zip(groups, expected_groups):
+			optimizer._validate_group({**saved, "params": expected["params"]})
+			if saved["algorithm"] == "muon":
+				expected.update(momentum=saved_config["muon_momentum"], nesterov=True,
+					ns_steps=saved_config["muon_ns_steps"], ns_dtype={"bf16": torch.bfloat16,
+						"fp32": torch.float32, "fp64": torch.float64}[saved_config["muon_ns_dtype"]])
+			else:
+				expected.update(betas=(saved_config["adam_beta1"], saved_config["adam_beta2"]),
+					eps=saved_config["adam_eps"], fused=saved_config["adam_fused"])
+			if any(saved[key] != value for key, value in expected.items()
+					if key not in ("params", "param_names", "muon_shape")):
+				raise ValueError("Optimizer hyperparameters differ from the saved training recipe")
 	train_position = train_loader.validate_state_dict(checkpoint["loaders"]["train"])
 	val_loader.validate_state_dict(checkpoint["loaders"]["val"])
 	if config.overfit_batch and state.step > 0 and state.overfit_batch_start is None:
@@ -336,10 +381,9 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	model.load_state_dict(checkpoint["model"])
 	optimizer.load_state_dict(checkpoint["optimizer"])
 	optimizer.zero_grad(set_to_none=True)
-	config.learning_rate = saved_config["learning_rate"] if version >= 4 else optimizer.param_groups[0]["lr"]
-	config.weight_decay = saved_config["weight_decay"]
-	config.adam_beta1, config.adam_beta2 = optimizer.param_groups[0]["betas"]
-	config.adam_eps = optimizer.param_groups[0]["eps"]
+	for name in ("learning_rate", "weight_decay", "adam_beta1", "adam_beta2", "adam_eps",
+				 "muon_momentum", "muon_ns_steps"):
+		setattr(config, name, saved_config[name])
 	train_loader.load_state_dict(checkpoint["loaders"]["train"])
 	val_loader.load_state_dict(checkpoint["loaders"]["val"])
 	_restore_rng_state(checkpoint["rng_state"], next(model.parameters()).device)
@@ -358,7 +402,7 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 	that batch without advancing the restored loader cursor.
 	Each update averages equal-size microbatch losses. QB updates per forward,
 	so accumulation is not equivalent to concatenation for stateful MoE routing.
-	FP16 overflow skips AdamW and LR progression; consumed tokens and QB remain.
+	FP16 overflow skips the whole optimizer and LR progression; consumed tokens and QB remain.
 	An optional open MetricsWriter records scalar metrics without changing state.
 	"""
 	state = TrainState() if state is None else state

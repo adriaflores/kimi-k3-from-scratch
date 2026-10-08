@@ -90,13 +90,27 @@ throughput in an unprofiled run with the same hardware and recipe.
 
 ### Initial training recipe
 
-The presets use AdamW with peak LR `3e-4`, betas `(0.9, 0.95)`, epsilon `1e-8`
-and global L2 gradient clipping at `1.0`. Weight decay applies to matrices;
-1D norms, biases and gate parameters are excluded. Tied embeddings appear
-once in the optimizer. AdamW uses PyTorch's fused kernel by default
-(`adam_fused: true`), which measured ~10% more tokens/s; `--no-adam-fused`
-selects the unfused implementation. These are initial test settings, not
-tuned Kimi K3 pretraining hyperparameters.
+The trainer uses one fixed hybrid optimizer: **Muon for hidden matrices and
+native AdamW for auxiliary parameters**. Embeddings and the vocabulary head,
+norm gains, biases, scalar/vector gates, AttnRes pseudo-query vectors and KDA's
+depthwise short-convolution filters use AdamW. Tied weights appear once. Norms,
+biases and logical vectors have no weight decay; matrices and convolution
+filters use the configured decay. Fused FFN gate/up storage is viewed as two
+independent matrices, each with its own Newton–Schulz normalization and scaling.
+
+Muon uses Nesterov momentum `0.95`, five Newton–Schulz iterations in BF16, and
+Moonlight's `0.2 * sqrt(max(rows, columns))` update scale. Both algorithms share
+the same peak LR and schedule. The presets keep peak LR `3e-4`, auxiliary AdamW
+betas `(0.9, 0.95)`, epsilon `1e-8`, and global gradient clipping at `1.0`.
+`adam_fused: true` selects native fused AdamW; `--no-adam-fused` changes its
+execution backend. `muon_momentum`, `muon_ns_steps` and `muon_ns_dtype` also have
+CLI overrides; FP32/FP64 NS arithmetic is available for numerical checks.
+These are local test settings, not tuned Kimi K3 pretraining hyperparameters.
+
+This is **deliverable 2**: attention projections are still full matrices.
+Per-head attention assignment and attention weight clipping remain separate
+upcoming deliverables. See [the assignment and integration contract](docs/notes/muon_training_integration.md).
+
 For direct Python calls to `train`, a fresh optimizer's initial LR supplies
 the schedule's peak. The CLI constructs that optimizer from the recipe.
 
@@ -126,14 +140,15 @@ not known before measuring the chosen model and hardware.
 
 All presets start in FP32 as a numerical reference. `--precision bf16` uses
 autocast on CPU or CUDA with native BF16 support; `--precision fp16` uses CUDA
-autocast and GradScaler. Parameters, gradients and AdamW moments stay FP32.
+autocast and GradScaler. Parameters, gradients, Muon momentum buffers and
+AdamW moments stay FP32. NS working precision is independent of autocast.
 The chunkwise KDA solve/recurrent core and MoE router/QB remain FP32 under
 autocast; the fused KDA follows FLA's kernel precision.
 Training and validation use the same precision. Follow PyTorch's
 [AMP order](https://docs.pytorch.org/docs/stable/notes/amp_examples.html):
 average microbatch losses, accumulate scaled gradients, unscale once, clip,
 then step/update the scaler. Non-finite FP32/BF16 gradients fail immediately.
-An FP16 gradient overflow reduces the scale and skips AdamW and LR progression;
+An FP16 gradient overflow reduces the scale and skips both algorithms and LR progression;
 consumed tokens and QB updates remain, and are checkpointed. The loop fails
 after 32 consecutive skips. `tokens_seen` includes skipped/repeated batches;
 `grad_norm` is the unscaled global norm before clipping.
@@ -149,14 +164,14 @@ Change the training YAML for the next test and give each run its own checkpoint.
 For precision comparisons, start each run from the same seed and choose FP32,
 BF16 or FP16 explicitly. `--max-grad-norm 0` disables clipping. The bare CLI
 keeps the original constant-LR, FP32, accumulation-one, clipping-disabled
-defaults for checkpoint compatibility; the preset YAMLs enable the recipe above.
+defaults; it uses the same hybrid optimizer. The preset YAMLs enable the recipe above.
 
 ### Checkpoints and resume
 
-New checkpoints use trainer format version 4 and are written atomically after a
+New checkpoints use trainer format version 6 and are written atomically after a
 completed optimizer update, with no pending gradients. They contain model
-parameters and persistent buffers (including Quantile Balancing biases), AdamW
-state and hyperparameters, step/token/skip counters, GradScaler state for FP16,
+parameters and persistent buffers (including Quantile Balancing biases), Muon
+momentum and native AdamW state and hyperparameters, step/token/skip counters, GradScaler state for FP16,
 the training recipe, both data-loader cursors, and Python, NumPy, PyTorch CPU
 and active-device CUDA RNG states. In overfit mode,
 the fixed batch's starting token offset is saved so resume rereads those same
@@ -166,9 +181,10 @@ For a deterministic comparison, use `--deterministic` in both the initial and
 resumed runs. Resume restores RNG after rebuilding the model and optimizer;
 `--seed` does not replace the saved state. `--max-steps` is the total target
 number of successful updates, including the saved steps. Saved optimizer
-hyperparameters override the CLI learning rate, weight decay, betas and epsilon.
-The parameter-group layout must match: this builder uses one group for zero
-weight decay and separate matrix/1D groups for nonzero decay.
+hyperparameters override CLI learning rate, weight decay, betas, epsilon, Muon
+momentum and NS iteration count. The parameter-group layout must match, including
+canonical names, shapes, dtypes and declared matrix views. Group separation stays
+stable when weight decay is zero. `adam_fused` and `muon_ns_dtype` must match.
 The LR schedule is derived from the restored step and saved base LR; it has
 no separate mutable scheduler object. `decay_steps` fixes its horizon and must
 match on resume, even when a first segment uses a smaller `max_steps`.
@@ -192,15 +208,10 @@ execution settings before loading state. Resume a preset run with the same
 `--training-config` and matching recipe overrides.
 Prepared shards must remain unchanged: manifest identity includes their
 recorded checksums, but startup does not hash entire shard files. The data
-directory can move if its manifest and files are identical. Format version 2
-checkpoints lack cursors/RNG and cannot provide this complete resume; keep
-existing checkpoints separate when testing the new format.
-Version 3 still resumes with its original FP32, accumulation-one, constant-LR,
-no-warmup, clipping-disabled recipe and single AdamW group (use the bare CLI
-without a new training YAML or weight-decay override). This preserves its
-stored optimizer settings; it is not converted silently into a new recipe.
-Checkpoints before format version 5 were trained with unfused AdamW, so resume
-them with `--no-adam-fused`.
+directory can move if its manifest and files are identical. Legacy AdamW trainer
+checkpoints (versions 3–5) cannot resume this Muon recipe; start a new run.
+Earlier checkpoints also lack the required state. The loader rejects them before
+changing model weights, optimizer state, data cursors or RNG.
 
 Exact equivalence requires the same software, hardware and execution settings
 with deterministic kernels; PyTorch does not promise reproducibility across
@@ -213,7 +224,7 @@ uv run pytest -q tests/unit/training/test_recipe.py tests/integration/test_check
 ```
 
 These tests compare continuous training with a saved/reconstructed/resumed
-run: losses, all model tensors, AdamW state, counters, cursors and subsequent
+run: losses, all model tensors, Muon and AdamW state, counters, cursors and subsequent
 random draws. They cover real mixed KDA/MLA/MoE layers, a fixed batch starting
 at a nonzero offset, shard boundaries and exhaustion, stochastic training,
 validation isolation, incompatible resumes, and fresh CLI processes. The

@@ -35,7 +35,7 @@ def test_warmup_cosine_boundaries_do_not_depend_on_interruption_length():
 	assert learning_rate_at_step(no_warmup, 1) == config.learning_rate
 
 
-def test_adamw_groups_cover_tied_weights_once_and_exclude_1d_decay(kda_config_factory):
+def test_hybrid_groups_cover_tied_weights_once_and_exclude_vectors_from_decay(kda_config_factory):
 	model = KimiK3(kda_config_factory())
 	config = TrainConfig(weight_decay=0.1)
 	optimizer = build_optimizer(model, config)
@@ -44,22 +44,25 @@ def test_adamw_groups_cover_tied_weights_once_and_exclude_1d_decay(kda_config_fa
 	assert len(flattened) == len({id(parameter) for parameter in flattened})
 	assert {id(parameter) for parameter in flattened} == {id(parameter) for parameter in model.parameters()}
 	for group in optimizer.param_groups:
-		assert group["betas"] == (0.9, 0.95)
-		assert group["eps"] == 1e-8
+		if group["algorithm"] == "adamw":
+			assert group["betas"] == (0.9, 0.95)
+			assert group["eps"] == 1e-8
 		for parameter in group["params"]:
-			assert group["weight_decay"] == (0.1 if parameter.ndim >= 2 else 0)
+			if parameter.ndim < 2:
+				assert group["algorithm"] == "adamw" and group["weight_decay"] == 0
+	assert {group["algorithm"] for group in optimizer.param_groups} == {"muon", "adamw"}
 
 
 @pytest.mark.parametrize("weight_decay", [0.0, 0.1])
-def test_adam_fused_reaches_every_param_group(kda_config_factory, weight_decay):
+def test_adam_fused_reaches_only_auxiliary_groups(kda_config_factory, weight_decay):
 	model = KimiK3(kda_config_factory())
 
 	default = build_optimizer(model, TrainConfig(weight_decay=weight_decay))
 	unfused = build_optimizer(model, TrainConfig(weight_decay=weight_decay, adam_fused=False))
 
-	assert unfused.defaults["fused"] is False
-	assert default.defaults["fused"] is True
-	assert all(group["fused"] is True for group in default.param_groups)
+	assert all(group["fused"] is False for group in unfused.param_groups if group["algorithm"] == "adamw")
+	assert all(group["fused"] is True for group in default.param_groups if group["algorithm"] == "adamw")
+	assert all("fused" not in group for group in default.param_groups if group["algorithm"] == "muon")
 
 
 DEVICES = ["cpu", pytest.param(
@@ -77,10 +80,15 @@ def test_fused_adamw_updates_match_the_default_implementation(kda_config_factory
 	idx = torch.randint(0, reference.config.vocab_size, (2, 16), device=device)
 
 	for _ in range(3):
-		for model, optimizer in zip((reference, fused), optimizers):
+		for optimizer in optimizers:
 			optimizer.zero_grad(set_to_none=True)
-			_, loss = model(idx, targets=idx)
-			loss.backward()
+		_, loss = reference(idx, targets=idx)
+		loss.backward()
+		# Compare execution backends on identical gradients. Small AdamW rounding
+		# differences can cross BF16 Newton-Schulz rounding boundaries on later forwards.
+		for expected, actual in zip(reference.parameters(), fused.parameters()):
+			actual.grad = None if expected.grad is None else expected.grad.clone()
+		for optimizer in optimizers:
 			optimizer.step()
 
 	for (name, expected), actual in zip(reference.state_dict().items(), fused.state_dict().values()):
@@ -92,6 +100,14 @@ def test_adam_fused_cli_flag_overrides_the_recipe():
 	assert build_train_config(parse_args(base)).adam_fused is True
 	assert build_train_config(parse_args(base + ["--adam-fused"])).adam_fused is True
 	assert build_train_config(parse_args(base + ["--no-adam-fused"])).adam_fused is False
+
+
+def test_muon_cli_overrides_without_an_optimizer_selector():
+	args = parse_args(["--data-dir", "unused", "--smoke-test", "--muon-momentum", "0.9",
+		"--muon-ns-steps", "7", "--muon-ns-dtype", "fp32"])
+	config = build_train_config(args)
+	assert (config.muon_momentum, config.muon_ns_steps, config.muon_ns_dtype) == (0.9, 7, "fp32")
+	assert not hasattr(args, "optimizer")
 
 
 @pytest.mark.parametrize("name,steps,accumulation,overfit", [
@@ -116,6 +132,8 @@ def test_preset_loads_shared_yaml_schema_and_cli_overrides(name, steps, accumula
 	{"gradient_accumulation_steps": 0}, {"precision": "int8"},
 	{"lr_schedule": "cosine", "warmup_steps": 100, "decay_steps": 100},
 	{"adam_beta2": 1.0}, {"max_grad_norm": float("nan")}, {"min_lr_ratio": -0.1},
+	{"muon_momentum": 1.0}, {"muon_momentum": float("nan")}, {"muon_momentum": True},
+	{"muon_ns_steps": 0}, {"muon_ns_steps": True}, {"muon_ns_steps": 1.5}, {"muon_ns_dtype": "fp16"},
 ])
 def test_invalid_recipe_is_rejected(kwargs):
 	with pytest.raises(ValueError):

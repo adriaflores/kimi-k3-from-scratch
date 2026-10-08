@@ -58,6 +58,11 @@ def test_run_records_provenance_without_changing_training_state(run_arguments):
 	assert session["data"]["train"]["source"]["revision"] == "pinned-data"
 	assert session["data"]["val"]["tokenizer"]["revision"] == "pinned-tokenizer"
 	assert session["train_config"]["seed"] == run_arguments["config"].seed
+	groups = session["optimizer"]["param_groups"]
+	assert {group["algorithm"] for group in groups} == {"muon", "adamw"}
+	assert all(group["ns_dtype"] == "torch.bfloat16" for group in groups if group["algorithm"] == "muon")
+	assert sum(group["element_count"] for group in groups) == session["parameter_count"]
+	assert sum(group["parameter_count"] for group in groups) == len(list(model.parameters()))
 	assert session["environment"]["torch"] == str(torch.__version__)
 	assert session["environment"]["hardware"]["device"] == "cpu"
 	assert session["environment"]["hardware"]["gpu"] is None

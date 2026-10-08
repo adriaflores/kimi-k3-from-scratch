@@ -148,9 +148,9 @@ def test_kimi_resume_matches_continuous_updates(prepared_data, tmp_path, kda_con
 	def construct(seed, max_steps):
 		_seed(seed)
 		model = KimiK3(architecture).to(device)
-		optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0)
 		config = replace(_train_config(overfit_batch=overfit), max_steps=max_steps,
 						 precision="bf16" if device == "cuda" else "fp32")
+		optimizer = build_optimizer(model, config)
 		loaders = _loaders(prepared_data, config)
 		# Catch a resume implementation that assumes the fixed batch always starts at zero.
 		if overfit:
@@ -216,8 +216,8 @@ def test_resume_restores_rng_used_by_training(prepared_data, tmp_path, device):
 		random.gauss(0, 1)
 		np.random.normal()
 		model = StochasticLM().to(device)
-		optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0)
 		config = replace(_train_config(), max_steps=max_steps)
+		optimizer = build_optimizer(model, config)
 		return model, optimizer, config, _loaders(prepared_data, config)
 
 	full_model, full_optimizer, full_config, full_loaders = construct(123, 5)
@@ -287,12 +287,12 @@ def test_loader_resume_accepts_relocated_manifest_with_different_json_formatting
 
 @pytest.mark.parametrize("case", ["batch_size", "seq_len", "overfit_batch", "manifest", "cursor", "legacy",
 	"gradient_accumulation_steps", "precision", "lr_schedule", "warmup_steps", "max_grad_norm",
-	"decay_steps", "min_lr_ratio", "adam_fused"])
+	"decay_steps", "min_lr_ratio", "adam_fused", "muon_ns_dtype"])
 def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tmp_path, case):
 	_seed(123)
 	model = StochasticLM()
-	optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0)
 	config = replace(_train_config(), max_steps=2)
+	optimizer = build_optimizer(model, config)
 	if case in ("decay_steps", "min_lr_ratio"):
 		config = replace(config, lr_schedule="cosine")
 	loaders = _loaders(prepared_data, config)
@@ -303,7 +303,7 @@ def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tm
 	incompatible = {"batch_size": 1, "seq_len": 4, "overfit_batch": True,
 					"gradient_accumulation_steps": 2, "precision": "bf16", "lr_schedule": "cosine",
 					"warmup_steps": 1, "max_grad_norm": 0.1, "decay_steps": 1001, "min_lr_ratio": 0.2,
-					"adam_fused": False}
+					"adam_fused": False, "muon_ns_dtype": "fp32"}
 	if case in incompatible:
 		config = replace(config, **{case: incompatible[case]})
 	directory = _prepare_data(tmp_path / "changed", offset=1) if case == "manifest" else prepared_data
@@ -318,7 +318,7 @@ def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tm
 
 	_seed(999)
 	target = StochasticLM()
-	target_optimizer = torch.optim.AdamW(target.parameters(), lr=3e-4)
+	target_optimizer = build_optimizer(target, config)
 	model_before = copy.deepcopy(target.state_dict())
 	optimizer_before = copy.deepcopy(target_optimizer.state_dict())
 	cursors_before = [loader.position for loader in target_loaders]
@@ -334,36 +334,103 @@ def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tm
 	torch.testing.assert_close(torch.get_rng_state(), rng_before[2], rtol=0, atol=0)
 
 
-def test_v4_checkpoint_without_adam_fused_resumes_unfused(prepared_data, tmp_path):
-	# Version 4 checkpoints predate adam_fused and were trained unfused.
-	_seed(123)
+@pytest.mark.parametrize("version", [3, 4, 5])
+def test_legacy_adamw_checkpoint_is_rejected_before_mutation(prepared_data, tmp_path, version):
+	config = replace(_train_config(), max_steps=2)
 	model = StochasticLM()
-	optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0)
-	config = replace(_train_config(), max_steps=2, adam_fused=False)
-	checkpoint = tmp_path / "resume.pt"
-	train(model, optimizer, *_loaders(prepared_data, config), config, "cpu", checkpoint_path=checkpoint)
-	saved = torch.load(checkpoint, weights_only=True)
-	del saved["train_config"]["adam_fused"]
-	torch.save(saved, checkpoint)
-
-	config = replace(config, max_steps=5)
+	# Produce real auxiliary AdamW moments, representing the old trainer recipe.
+	optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
+	path = tmp_path / "legacy.pt"
+	train(model, optimizer, *_loaders(prepared_data, config), config, "cpu", checkpoint_path=path)
+	saved = torch.load(path, weights_only=True)
+	saved["format_version"] = version
+	saved.pop("optimizer_layout")
+	for name in ("muon_momentum", "muon_ns_steps", "muon_ns_dtype"):
+		saved["train_config"].pop(name)
+	torch.save(saved, path)
 	target = StochasticLM()
-	target_optimizer = torch.optim.AdamW(target.parameters(), lr=3e-4)
+	target_optimizer = build_optimizer(target, config)
 	loaders = _loaders(prepared_data, config)
-	# A current-format checkpoint must carry every recipe field.
-	with pytest.raises(KeyError, match="adam_fused"):
-		load_checkpoint(checkpoint, target, target_optimizer, config, vocab_size=32,
-						train_loader=loaders[0], val_loader=loaders[1])
+	before = copy.deepcopy(target.state_dict())
+	optimizer_before = copy.deepcopy(target_optimizer.state_dict())
+	with pytest.raises(ValueError, match="Legacy AdamW.*start a new run"):
+		load_checkpoint(path, target, target_optimizer, config, vocab_size=32,
+			train_loader=loaders[0], val_loader=loaders[1])
+	_assert_equal(target.state_dict(), before)
+	_assert_equal(target_optimizer.state_dict(), optimizer_before)
+	assert all(loader.position == 0 for loader in loaders)
 
-	saved["format_version"] = 4
-	torch.save(saved, checkpoint)
-	state = load_checkpoint(checkpoint, target, target_optimizer, config, vocab_size=32,
-							train_loader=loaders[0], val_loader=loaders[1])
 
+@pytest.mark.parametrize("case", ["layout_name", "missing_layout", "group_names", "group_indices",
+	"matrix_view", "momentum", "missing_recipe_field"])
+def test_hybrid_checkpoint_rejects_changed_assignment_before_mutation(
+	prepared_data, tmp_path, kda_config_factory, case,
+):
+	config = replace(_train_config(), max_steps=1, weight_decay=0.1)
+	architecture = kda_config_factory(num_layers=2, layer_types=("kda", "mla"), num_dense_layers=1)
+	model = KimiK3(architecture)
+	path = tmp_path / "hybrid.pt"
+	train(model, build_optimizer(model, config), *_loaders(prepared_data, config), config, "cpu", checkpoint_path=path)
+	saved = torch.load(path, weights_only=True)
+	group = next(group for group in saved["optimizer"]["param_groups"]
+		if group["algorithm"] == "muon" and "muon_shape" not in group)
+	if case == "layout_name":
+		saved["optimizer_layout"][0]["parameters"][0]["name"] = "different.weight"
+	elif case == "missing_layout":
+		saved.pop("optimizer_layout")
+	elif case == "group_names":
+		group["param_names"][:2] = reversed(group["param_names"][:2])
+	elif case == "group_indices":
+		group["params"][:2] = reversed(group["params"][:2])
+	elif case == "matrix_view":
+		group["muon_shape"] = (1, 24, 16)
+	elif case == "momentum":
+		group["momentum"] = 0.8
+	else:
+		saved["train_config"].pop("muon_ns_dtype")
+	torch.save(saved, path)
+	target = KimiK3(architecture)
+	optimizer = build_optimizer(target, config)
+	loaders = _loaders(prepared_data, config)
+	before = copy.deepcopy(target.state_dict())
+	optimizer_before = copy.deepcopy(optimizer.state_dict())
+	rng_before = (random.getstate(), np.random.get_state(), torch.get_rng_state())
+	config_before = asdict(config)
+	with pytest.raises(ValueError):
+		load_checkpoint(path, target, optimizer, config, vocab_size=32,
+			train_loader=loaders[0], val_loader=loaders[1])
+	_assert_equal(target.state_dict(), before)
+	_assert_equal(optimizer.state_dict(), optimizer_before)
+	assert asdict(config) == config_before
+	assert all(loader.position == 0 for loader in loaders)
+	assert random.getstate() == rng_before[0]
+	np.testing.assert_equal(np.random.get_state(), rng_before[1])
+	_assert_equal(torch.get_rng_state(), rng_before[2])
+
+
+def test_hybrid_resume_restores_all_hyperparameters_even_after_zero_decay_build(
+	prepared_data, tmp_path, kda_config_factory,
+):
+	config = replace(_train_config(), max_steps=2, weight_decay=0.2, muon_momentum=0.9,
+		muon_ns_steps=7, adam_beta1=0.8, adam_beta2=0.98, adam_eps=1e-7)
+	architecture = kda_config_factory(num_layers=2, layer_types=("kda", "mla"), num_dense_layers=1)
+	model = KimiK3(architecture)
+	path = tmp_path / "restore.pt"
+	train(model, build_optimizer(model, config), *_loaders(prepared_data, config), config, "cpu", checkpoint_path=path)
+	target = KimiK3(architecture)
+	requested = replace(config, max_steps=3, learning_rate=0.5, weight_decay=0,
+		muon_momentum=0.7, muon_ns_steps=3, adam_beta1=0.6, adam_beta2=0.7, adam_eps=0.1)
+	optimizer = build_optimizer(target, requested)
+	loaders = _loaders(prepared_data, requested)
+	state = load_checkpoint(path, target, optimizer, requested, vocab_size=32,
+		train_loader=loaders[0], val_loader=loaders[1])
 	assert state.step == 2
-	with pytest.raises(ValueError, match="adam_fused"):
-		load_checkpoint(checkpoint, target, target_optimizer, replace(config, adam_fused=True), vocab_size=32,
-						train_loader=loaders[0], val_loader=loaders[1])
+	for name in ("learning_rate", "weight_decay", "muon_momentum", "muon_ns_steps",
+		"adam_beta1", "adam_beta2", "adam_eps"):
+		assert getattr(requested, name) == getattr(config, name)
+	train(target, optimizer, *loaders, requested, "cpu", state=state)
+	assert state.step == 3
+	assert {group["lr"] for group in optimizer.param_groups} == {config.learning_rate}
 
 
 @pytest.mark.parametrize("overfit", [False, True])
@@ -396,7 +463,8 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 		if resume is not None:
 			# Saved optimizer settings must win, including in the run manifest.
 			args.extend(["--resume", str(resume), "--learning-rate", "0.5",
-						 "--adam-beta1", "0.5", "--adam-beta2", "0.8", "--adam-eps", "0.01"])
+						 "--adam-beta1", "0.5", "--adam-beta2", "0.8", "--adam-eps", "0.01",
+						 "--muon-momentum", "0.8", "--muon-ns-steps", "7"])
 		result = subprocess.run(args, cwd=tmp_path,
 								env={**os.environ, "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"},
 								capture_output=True, text=True, check=False, timeout=60)
@@ -421,7 +489,7 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 	assert session["start_state"]["loaders"] == partial["loaders"]
 	assert session["train_config"]["max_steps"] == 5
 	assert session["train_config"]["learning_rate"] == partial["train_config"]["learning_rate"]
-	for name in ("adam_beta1", "adam_beta2", "adam_eps", "weight_decay"):
+	for name in ("adam_beta1", "adam_beta2", "adam_eps", "weight_decay", "muon_momentum", "muon_ns_steps"):
 		assert session["train_config"][name] == partial["train_config"][name]
 	assert session["optimizer"]["param_groups"][0]["lr"] == partial["optimizer"]["param_groups"][0]["lr"]
 	assert session["rng_source"] == "checkpoint"
@@ -448,7 +516,7 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 				assert layer["tokens"] == record["tokens"] == (32 if use_recipe else 16)
 				assert sum(layer["expert_counts"]) == layer["tokens"] * 2
 				assert len(layer["qb_biases"]) == 4
-	assert resumed["format_version"] == 5
+	assert resumed["format_version"] == 6
 	assert resumed["train_config"]["gradient_accumulation_steps"] == (2 if use_recipe else 1)
 	for key in ("model", "optimizer", "loaders", "rng_state", "step", "tokens_seen", "overfit_batch_start",
 				"skipped_updates", "grad_scaler_state"):
@@ -496,6 +564,7 @@ def test_recipe_resume_keeps_accumulation_lr_precision_and_scaler(
 		def record(optimizer, args, kwargs):
 			if _skipped_by_grad_scaler(optimizer):
 				return
+			assert len({group["lr"] for group in optimizer.param_groups}) == 1
 			lrs.append(optimizer.param_groups[0]["lr"])
 			clipped_norms.append(torch.cat([
 				p.grad.detach().flatten() for p in model.parameters() if p.grad is not None]).norm().item())
@@ -555,44 +624,16 @@ def test_accumulation_matches_large_batch_for_stateless_model(prepared_data):
 	assert accumulated_loaders[0].position == large_loaders[0].position
 
 
-def test_v3_resume_preserves_original_recipe(prepared_data, tmp_path):
-	def construct(seed, max_steps):
-		_seed(seed)
-		model = StochasticLM()
-		# v3 predates adam_fused, so resuming it requires the unfused optimizer it was trained with.
-		config = replace(_train_config(), max_steps=max_steps, adam_fused=False)
-		# The previous CLI used AdamW's beta2=0.999, not the new recipe's 0.95.
-		optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=0)
-		return model, optimizer, config, _loaders(prepared_data, config)
-
-	full, full_optimizer, full_config, full_loaders = construct(123, 5)
-	train(full, full_optimizer, *full_loaders, full_config, "cpu")
-	partial, partial_optimizer, config, loaders = construct(123, 2)
-	path = tmp_path / "v3.pt"
-	train(partial, partial_optimizer, *loaders, config, "cpu", checkpoint_path=path)
-	payload = torch.load(path, weights_only=True)
-	payload["format_version"] = 3
-	for name in ("skipped_updates", "grad_scaler_state"):
-		payload.pop(name)
-	old_fields = ("batch_size", "seq_len", "learning_rate", "weight_decay", "max_steps", "log_interval",
-				  "eval_interval", "eval_batches", "checkpoint_interval", "overfit_batch")
-	payload["train_config"] = {key: value for key, value in payload["train_config"].items() if key in old_fields}
-	torch.save(payload, path)
-	resumed, optimizer, config, loaders = construct(999, 5)
-	state = load_checkpoint(path, resumed, optimizer, config, vocab_size=32,
-							train_loader=loaders[0], val_loader=loaders[1])
-	assert config.adam_beta2 == 0.999
-	train(resumed, optimizer, *loaders, config, "cpu", state=state)
-	_assert_equal(resumed.state_dict(), full.state_dict())
-	_assert_equal(optimizer.state_dict(), full_optimizer.state_dict())
-
-
 @CUDA_REQUIRED
-def test_cuda_fp16_overflow_does_not_advance_optimizer_or_warmup(prepared_data, tmp_path):
+@pytest.mark.parametrize("real_backbone", [False, True])
+def test_cuda_fp16_overflow_does_not_advance_optimizer_or_warmup(
+	prepared_data, tmp_path, kda_config_factory, real_backbone,
+):
 	from scripts.train import SmokeTestLM
 
 	_seed(123)
-	model = SmokeTestLM(32).cuda()
+	model = (KimiK3(kda_config_factory(num_layers=2, layer_types=("kda", "mla"),
+		num_dense_layers=2)) if real_backbone else SmokeTestLM(32)).cuda()
 	config = replace(_train_config(), max_steps=3, precision="fp16", warmup_steps=2,
 					 gradient_accumulation_steps=2, max_grad_norm=0.1)
 	optimizer = build_optimizer(model, config)
@@ -606,10 +647,20 @@ def test_cuda_fp16_overflow_does_not_advance_optimizer_or_warmup(prepared_data, 
 			return torch.full_like(gradient, float("inf"))
 		return gradient
 
-	model.head.weight.register_hook(overflow_once)
+	(model.layers[0].attn.QKV.weight if real_backbone else model.head.weight).register_hook(overflow_once)
+	initial_weights = copy.deepcopy(model.state_dict())
+	initial_buffers = {name for name, _ in model.named_buffers()}
 	lrs = []
-	optimizer.register_step_pre_hook(lambda optimizer, args, kwargs: None if _skipped_by_grad_scaler(optimizer)
-									 else lrs.append(optimizer.param_groups[0]["lr"]))
+	def record_first_success(optimizer, args, kwargs):
+		if not lrs:
+			# No successful update has happened, despite at least one overflow.
+			assert not optimizer.state
+			for name, tensor in model.state_dict().items():
+				if name not in initial_buffers:
+					_assert_equal(tensor, initial_weights[name])
+		assert len({group["lr"] for group in optimizer.param_groups}) == 1
+		lrs.append(optimizer.param_groups[0]["lr"])
+	optimizer.register_step_pre_hook(record_first_success)
 	initial_state = TrainState()
 	run = start_run(model=model, optimizer=optimizer, config=config, state=initial_state,
 					train_loader=loaders[0], val_loader=loaders[1], repo_root=tmp_path,

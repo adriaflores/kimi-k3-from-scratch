@@ -88,6 +88,11 @@ def test_cli_trains_and_saves_selected_model(prepared_data, tmp_path, smoke_test
 	assert session["checkpoint_path"] == str(checkpoint)
 	assert len(session["git"]["commit"]) == 40
 	saved = torch.load(checkpoint, map_location="cpu", weights_only=True)
+	assert saved["format_version"] == 6
+	assert saved["optimizer_type"].endswith(".MuonAdamW")
+	assert "Muon momentum=" in result.stdout
+	assert {group["algorithm"] for group in saved["optimizer"]["param_groups"]} == (
+		{"adamw"} if smoke_test else {"muon", "adamw"})
 	assert saved["step"] == 2
 	assert saved["tokens_seen"] == 16
 	assert saved["optimizer"]["state"]
@@ -128,6 +133,7 @@ def test_incompatible_data_dimensions_are_rejected(vocab_size, seq_len, message)
 
 
 def test_fused_kda_model_does_not_require_kda_chunk_alignment(tmp_path):
+	pytest.importorskip("fla.ops.kda", reason="FLA is required to construct the fused KDA")
 	data = yaml.safe_load(MODEL_CONFIG.read_text(encoding="utf-8"))
 	data.update(kda_implementation="fused", kda_chunk_size=64)
 	path = tmp_path / "fused_kda.yaml"

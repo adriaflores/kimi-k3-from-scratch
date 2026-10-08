@@ -15,6 +15,9 @@ adam_beta1: 0.9
 adam_beta2: 0.95
 adam_eps: 1.0e-08
 adam_fused: true
+muon_momentum: 0.95
+muon_ns_steps: 5
+muon_ns_dtype: bf16
 lr_schedule: constant
 warmup_steps: 0
 decay_steps: 1000

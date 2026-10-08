@@ -74,12 +74,13 @@ def parse_args(argv=None):
 	parser.add_argument("--training-config", type=Path, help="Complete TrainConfig YAML; CLI values override it")
 	for name in ("batch_size", "seq_len", "max_steps", "log_interval", "eval_interval",
 				 "eval_batches", "checkpoint_interval", "gradient_accumulation_steps",
-				 "warmup_steps", "decay_steps", "seed"):
+				 "warmup_steps", "decay_steps", "seed", "muon_ns_steps"):
 		parser.add_argument("--" + name.replace("_", "-"), type=int)
 	for name in ("learning_rate", "weight_decay", "adam_beta1", "adam_beta2", "adam_eps",
-				 "min_lr_ratio", "max_grad_norm"):
+				 "min_lr_ratio", "max_grad_norm", "muon_momentum"):
 		parser.add_argument("--" + name.replace("_", "-"), type=float)
 	parser.add_argument("--adam-fused", action=argparse.BooleanOptionalAction, default=None)
+	parser.add_argument("--muon-ns-dtype", choices=("bf16", "fp32", "fp64"))
 	parser.add_argument("--precision", choices=("fp32", "bf16", "fp16"))
 	parser.add_argument("--lr-schedule", choices=("constant", "cosine"))
 	parser.add_argument("--run-dir", type=Path, help="Run folder; defaults to a unique folder under results/training/runs")
@@ -156,8 +157,13 @@ def main():
 			  f"wait={profile_config.wait}, warmup={profile_config.warmup}, active={profile_config.active} attempts")
 	print(f"Device: {device} | parameters: {sum(p.numel() for p in model.parameters()):,}")
 	tokens_per_update = config.batch_size * config.seq_len * config.gradient_accumulation_steps
-	print(f"AdamW betas=({config.adam_beta1}, {config.adam_beta2}) | eps={config.adam_eps:g}"
+	print(f"Muon momentum={config.muon_momentum} | Nesterov=True"
+		  f" | NS={config.muon_ns_steps} x {config.muon_ns_dtype}")
+	print(f"Auxiliary AdamW betas=({config.adam_beta1}, {config.adam_beta2}) | eps={config.adam_eps:g}"
 		  f" | weight_decay={config.weight_decay:g} | precision={config.precision} | fused={config.adam_fused}")
+	for algorithm in ("muon", "adamw"):
+		parameters = [p for group in optimizer.param_groups if group["algorithm"] == algorithm for p in group["params"]]
+		print(f"{algorithm}: {len(parameters)} parameter tensors, {sum(p.numel() for p in parameters):,} elements")
 	print(f"microbatch={config.batch_size} x {config.seq_len}"
 		  f" | accumulation={config.gradient_accumulation_steps} | tokens/update={tokens_per_update:,}"
 		  f" | target updates={config.max_steps:,}"

@@ -5,8 +5,8 @@ and KellerJordan/Muon. The shape scaling follows Moonlight, Eq. (4), rather
 than the original Muon learning-rate convention. Upstream MIT notices and
 pinned source revisions are in references/muon/NOTICE.md.
 
-This module deliberately requires explicit parameter groups. Model-specific
-assignment, per-head views and attention weight clipping are separate stages.
+This module requires explicit parameter groups. Model-specific assignment is
+in parameter_groups.py; per-head attention and weight clipping are later stages.
 """
 
 import math
@@ -90,9 +90,10 @@ class MuonAdamW(torch.optim.Optimizer):
 			{"params": auxiliary_parameters, "algorithm": "adamw"},
 		], lr=3e-4, weight_decay=0.1, adamw_fused=True)
 
-	No model parameters are assigned automatically. Muon parameters are 2D;
-	convolution flattening, fused-projection splitting and per-head routing
-	must be specified by the model integration, not inferred from rank.
+	Muon parameters have 2D storage. A group's optional ``muon_shape`` declares
+	a view of independent matrices, e.g. ``(2, intermediate, hidden)`` for fused
+	FFN gate/up. Its product must match each parameter's size. Matrix dimensions
+	for RMS scaling are those of the view, rather than the fused storage shape.
 	"""
 
 	def __init__(self, param_groups: Iterable[dict], *, lr=3e-4,
@@ -123,6 +124,10 @@ class MuonAdamW(torch.optim.Optimizer):
 			if not isinstance(group["nesterov"], bool):
 				raise TypeError("nesterov must be a bool")
 			_validate_ns(group["ns_steps"], 1e-7, group["ns_dtype"])
+			view = group.get("muon_shape")
+			if view is not None and (not isinstance(view, (tuple, list)) or len(view) < 2
+					or any(isinstance(size, bool) or not isinstance(size, int) or size < 1 for size in view)):
+				raise ValueError("muon_shape must contain at least two positive integer dimensions")
 		else:
 			betas = group["betas"]
 			if not isinstance(betas, (tuple, list)) or len(betas) != 2:
@@ -147,6 +152,9 @@ class MuonAdamW(torch.optim.Optimizer):
 				raise TypeError("MuonAdamW needs dense FP32/FP64 parameters; use autocast for mixed precision")
 			if algorithm == "muon" and (parameter.ndim != 2 or parameter.numel() == 0):
 				raise ValueError("Muon groups require nonempty 2D parameters")
+			if (algorithm == "muon" and group.get("muon_shape") is not None
+					and math.prod(group["muon_shape"]) != parameter.numel()):
+				raise ValueError("muon_shape must match each parameter's number of elements")
 
 	def add_param_group(self, param_group):
 		"""Preserve input ordering and reject duplicates, including within a group."""
@@ -213,10 +221,11 @@ class MuonAdamW(torch.optim.Optimizer):
 				buffer = state["momentum_buffer"]
 				buffer.mul_(group["momentum"]).add_(gradient)
 				update = gradient.add(buffer, alpha=group["momentum"]) if group["nesterov"] else buffer
-				update = zeropower_via_newton_schulz(update, steps=group["ns_steps"], dtype=group["ns_dtype"])
-				scale = 0.2 * math.sqrt(max(parameter.shape))
+				shape = group.get("muon_shape") or parameter.shape
+				update = zeropower_via_newton_schulz(update.reshape(shape), steps=group["ns_steps"], dtype=group["ns_dtype"])
+				scale = 0.2 * math.sqrt(max(shape[-2:]))
 				parameter.mul_(1 - group["lr"] * group["weight_decay"])
-				parameter.add_(update, alpha=-group["lr"] * scale)
+				parameter.add_(update.reshape(parameter.shape), alpha=-group["lr"] * scale)
 		if self._adamw is not None:
 			self._adamw.step()
 		return loss

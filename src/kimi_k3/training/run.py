@@ -12,7 +12,13 @@ from uuid import uuid4
 import numpy as np
 import torch
 
-from .trainer import _model_config, _runtime_signature
+from .trainer import _model_config, _optimizer_layout, _runtime_signature
+
+
+def _json_value(value):
+	if isinstance(value, torch.dtype):
+		return str(value)
+	raise TypeError(f"Unsupported run metadata type: {type(value).__name__}")
 
 
 @dataclass(frozen=True)
@@ -86,7 +92,7 @@ def start_run(*, model, optimizer, config, state, train_loader, val_loader,
 	A fresh invocation creates its own folder. Resume appends a session when
 	run_dir is provided or run.json is beside the input checkpoint; otherwise
 	it creates a new run linked to that checkpoint. Explicit checkpoint paths
-	remain supported. Checkpoint format and the training loop are unchanged.
+	remain supported.
 	"""
 	resume_path = None if resume_path is None else Path(resume_path).resolve()
 	if (run_dir is None and resume_path is not None
@@ -130,7 +136,10 @@ def start_run(*, model, optimizer, config, state, train_loader, val_loader,
 		"train_config": asdict(config),
 		"optimizer": {
 			"type": f"{type(optimizer).__module__}.{type(optimizer).__qualname__}",
-			"param_groups": [{key: value for key, value in group.items() if key != "params"}
+			"layout": _optimizer_layout(model, optimizer),
+			"param_groups": [{**{key: value for key, value in group.items() if key != "params"},
+				"parameter_count": len(group["params"]),
+				"element_count": sum(parameter.numel() for parameter in group["params"])}
 							 for group in optimizer.param_groups],
 		},
 		"environment": _environment(model),
@@ -147,7 +156,7 @@ def start_run(*, model, optimizer, config, state, train_loader, val_loader,
 									 if checkpoint_path.is_relative_to(run_dir) else None),
 	}
 	# Normalize tuples (e.g. layer_types and AdamW betas) before comparing JSON.
-	session = json.loads(json.dumps(session, allow_nan=False))
+	session = json.loads(json.dumps(session, allow_nan=False, default=_json_value))
 	if manifest is not None:
 		previous = manifest["sessions"][-1]
 		if session["model_config"] != previous["model_config"] or any(
