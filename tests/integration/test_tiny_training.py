@@ -11,11 +11,19 @@ import pytest
 import torch
 import torch.nn.functional as F
 
+from scripts.summarize_training_run import summarize_run
 from scripts.train import build_model
 from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
 from src.kimi_k3.training.metrics import MetricsWriter
 from src.kimi_k3.training.run import start_run
-from src.kimi_k3.training.trainer import TrainConfig, TrainState, build_optimizer, evaluate, train
+from src.kimi_k3.training.trainer import (
+	TrainConfig,
+	TrainState,
+	build_optimizer,
+	evaluate,
+	load_checkpoint,
+	train,
+)
 from src.kimi_k3.utils import load_config
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -152,4 +160,73 @@ def test_shipped_tiny_memorizes_next_tokens_and_evaluates_without_mutation(tmp_p
 		"next_token_accuracy": (predictions == y).float().mean().item(),
 		"val_loss": val_loss, "train_cursor": train_loader.position,
 		"qb_frozen_in_eval": True, "run_directory": str(run.directory),
+	}))
+
+
+def _assert_checkpoint_equal(actual, expected):
+	if isinstance(actual, torch.Tensor):
+		torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+	elif isinstance(actual, dict):
+		assert actual.keys() == expected.keys()
+		for name in actual:
+			_assert_checkpoint_equal(actual[name], expected[name])
+	elif isinstance(actual, (list, tuple)):
+		assert type(actual) is type(expected) and len(actual) == len(expected)
+		for left, right in zip(actual, expected, strict=True):
+			_assert_checkpoint_equal(left, right)
+	else:
+		assert actual == expected
+
+
+@pytest.mark.parametrize("precision", ["fp32", "bf16"])
+def test_shipped_tiny_integrated_recipe_learns_and_resumes_exactly(tmp_path, single_thread, precision):
+	# The full 64-update recipe is a separate measured experiment. Keep this
+	# regression at 16 updates, retaining its LR, accumulation and fixed horizon.
+	base = replace(load_config(REPO_ROOT / "configs/training/acceptance.yaml", TrainConfig),
+		max_steps=16, precision=precision)
+	data = _prepare_data(tmp_path / "data")
+
+	def execute(directory, config, *, checkpoint=None, seed=None):
+		torch.manual_seed(config.seed if seed is None else seed)
+		loaders = [TokenDataLoader(ShardedTokenDataset(data, split), config.batch_size, config.seq_len)
+			for split in ("train", "val")]
+		model = build_model(49152, config.seq_len, model_config_path=MODEL_CONFIG)
+		optimizer = build_optimizer(model, config)
+		state = (load_checkpoint(checkpoint, model, optimizer, config, vocab_size=49152,
+			train_loader=loaders[0], val_loader=loaders[1]) if checkpoint else TrainState())
+		run = start_run(model=model, optimizer=optimizer, config=config, state=state,
+			train_loader=loaders[0], val_loader=loaders[1], repo_root=REPO_ROOT, run_dir=directory)
+		with MetricsWriter(run) as metrics:
+			train(model, optimizer, *loaders, config, "cpu", state=state,
+				checkpoint_path=run.checkpoint_path, metrics=metrics)
+		assert all(not hasattr(module, "_qk_clip_observer") for module in model.modules())
+		assert all(parameter.grad is None for parameter in model.parameters())
+		return torch.load(run.checkpoint_path, weights_only=True), run
+
+	continuous, run = execute(tmp_path / "continuous", replace(base))
+	_, partial = execute(tmp_path / "partial", replace(base, max_steps=8))
+	resumed, resumed_run = execute(tmp_path / "resumed", replace(base), checkpoint=partial.checkpoint_path, seed=999)
+	_assert_checkpoint_equal(resumed, continuous)
+	assert resumed["format_version"] == 7
+	assert resumed["train_config"]["learning_rate"] == 3e-4
+	assert resumed["step"] == 16 and resumed["tokens_seen"] == 4096
+	assert resumed["qk_clip"]["threshold"] == 100.0
+	states = resumed["optimizer"]["state"].values()
+	assert any("momentum_buffer" in state for state in states)
+	assert any("exp_avg" in state for state in states)
+	result = summarize_run(run.directory, after_step=8, expected_step=16)
+	assert result["last_logged_train_loss"] < result["first_logged_train_loss"]
+	assert result["skipped_updates"] == result["nonfinite_grad_norms"] == 0
+	assert result["optimizer_algorithms"] == ["adamw", "muon"]
+	assert result["qk_clip"]["observed_head_updates"] == 32
+	assert math.isfinite(result["qk_clip"]["max_logit"])
+	assert result["steady_logged_tokens"] == 2048
+	assert result["steady_train_tokens_per_second"] > 0
+	assert not result["profiled"]
+	continuation = summarize_run(resumed_run.directory, expected_step=16)
+	assert continuation["start_step"] == 8 and continuation["logged_updates"] == 8
+	print("tiny_hybrid_recipe: " + json.dumps({
+		"precision": precision, "updates": result["logged_updates"], "tokens": result["logged_tokens"],
+		"first_window_loss": result["first_logged_train_loss"], "last_window_loss": result["last_logged_train_loss"],
+		"qk_max_logit": result["qk_clip"]["max_logit"], "exact_resume": True,
 	}))

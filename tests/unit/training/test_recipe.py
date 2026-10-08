@@ -119,7 +119,8 @@ def test_qk_clip_cli_overrides_the_fixed_positive_recipe():
 
 
 @pytest.mark.parametrize("name,steps,accumulation,overfit", [
-	("smoke", 20, 1, False), ("overfit", 2000, 1, True), ("stability", 1000, 4, False)])
+	("smoke", 20, 1, False), ("overfit", 2000, 1, True), ("stability", 1000, 4, False),
+	("acceptance", 64, 2, True)])
 def test_preset_loads_shared_yaml_schema_and_cli_overrides(name, steps, accumulation, overfit):
 	path = REPO_ROOT / f"configs/training/{name}.yaml"
 	config = load_config(path, TrainConfig)
