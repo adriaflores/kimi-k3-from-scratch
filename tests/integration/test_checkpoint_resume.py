@@ -289,7 +289,7 @@ def test_loader_resume_accepts_relocated_manifest_with_different_json_formatting
 
 @pytest.mark.parametrize("case", ["batch_size", "seq_len", "overfit_batch", "manifest", "cursor", "legacy",
 	"gradient_accumulation_steps", "precision", "lr_schedule", "warmup_steps", "max_grad_norm",
-	"decay_steps", "min_lr_ratio", "adam_fused", "muon_ns_dtype"])
+	"decay_steps", "min_lr_ratio", "adam_fused", "muon_ns_dtype", "qk_clip_threshold", "qk_clip_chunk_size"])
 def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tmp_path, case):
 	_seed(123)
 	model = StochasticLM()
@@ -305,7 +305,8 @@ def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tm
 	incompatible = {"batch_size": 1, "seq_len": 4, "overfit_batch": True,
 					"gradient_accumulation_steps": 2, "precision": "bf16", "lr_schedule": "cosine",
 					"warmup_steps": 1, "max_grad_norm": 0.1, "decay_steps": 1001, "min_lr_ratio": 0.2,
-					"adam_fused": False, "muon_ns_dtype": "fp32"}
+					"adam_fused": False, "muon_ns_dtype": "fp32", "qk_clip_threshold": 80.0,
+					"qk_clip_chunk_size": 64}
 	if case in incompatible:
 		config = replace(config, **{case: incompatible[case]})
 	directory = _prepare_data(tmp_path / "changed", offset=1) if case == "manifest" else prepared_data
@@ -419,14 +420,15 @@ def test_hybrid_checkpoint_rejects_changed_assignment_before_mutation(
 	_assert_equal(torch.get_rng_state(), rng_before[2])
 
 
-def test_deliverable_2_full_attention_checkpoint_cannot_resume_per_head_recipe(
+def test_full_attention_grouping_cannot_resume_per_head_recipe(
 	prepared_data, tmp_path, kda_config_factory,
 ):
 	config = replace(_train_config(), max_steps=1, weight_decay=0.1)
 	architecture = kda_config_factory(num_layers=2, layer_types=("kda", "mla"), num_dense_layers=1)
 	model = KimiK3(architecture)
-	# Reconstruct milestone 2's grouping: same tensors and algorithms, fused
-	# gate/up still split, but QKV/UQ/UKV are complete attention matrices.
+	# Reconstruct milestone 2's grouping inside the current container format,
+	# exercising the layout guard independently of the legacy-format guard.
+	# Fused gate/up stays split; QKV/UQ/UKV are complete attention matrices.
 	assignment = {name: group for group in build_parameter_groups(model, config.weight_decay)
 		for name in group["param_names"]}
 	previous_groups = {}
@@ -446,7 +448,7 @@ def test_deliverable_2_full_attention_checkpoint_cannot_resume_per_head_recipe(
 	path = tmp_path / "full_attention.pt"
 	train(model, old_optimizer, *_loaders(prepared_data, config), config, "cpu", checkpoint_path=path)
 	saved = torch.load(path, weights_only=True)
-	assert saved["format_version"] == 6
+	assert saved["format_version"] == 7
 	assert not any("muon_split_sizes" in group for group in saved["optimizer_layout"])
 	assert saved["optimizer"]["state"]
 	target = KimiK3(architecture)
@@ -509,7 +511,8 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 				"--device", "cpu", "--batch-size", "2", "--seq-len", "8",
 				"--max-steps", str(max_steps), "--log-interval", "1", "--eval-interval", "3",
 				"--eval-batches", "2", "--checkpoint-interval", "2", "--seed", str(seed),
-				"--deterministic", "--run-dir", str(run_dir), "--checkpoint", str(checkpoint)]
+				"--deterministic", "--run-dir", str(run_dir), "--checkpoint", str(checkpoint),
+				"--qk-clip-threshold", "0.0001", "--qk-clip-chunk-size", "3"]
 		if overfit:
 			args.append("--overfit-batch")
 		if use_recipe:
@@ -570,7 +573,9 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 				assert layer["tokens"] == record["tokens"] == (32 if use_recipe else 16)
 				assert sum(layer["expert_counts"]) == layer["tokens"] * 2
 				assert len(layer["qb_biases"]) == 4
-	assert resumed["format_version"] == 6
+	assert resumed["format_version"] == 7
+	assert resumed["qk_clip"] == continuous["qk_clip"]
+	assert sum(record["qk_clip"]["clipped_head_updates"] for record in records if record["event"] == "train") > 0
 	assert resumed["train_config"]["gradient_accumulation_steps"] == (2 if use_recipe else 1)
 	for key in ("model", "optimizer", "loaders", "rng_state", "step", "tokens_seen", "overfit_batch_start",
 				"skipped_updates", "grad_scaler_state"):
@@ -603,7 +608,7 @@ def test_recipe_resume_keeps_accumulation_lr_precision_and_scaler(
 		config = replace(_train_config(overfit_batch=overfit), max_steps=max_steps,
 						 gradient_accumulation_steps=3, precision=precision,
 						 lr_schedule="cosine", warmup_steps=2, decay_steps=5,
-						 max_grad_norm=0.1, weight_decay=0.1)
+						 max_grad_norm=0.1, weight_decay=0.1, qk_clip_threshold=0.0001, qk_clip_chunk_size=3)
 		model = KimiK3(architecture).to(device)
 		if device == "cuda" and precision != "bf16":
 			# Keep FP32/FP16 trainer/scaler coverage using the pedagogical reference in this test only.
@@ -691,6 +696,11 @@ def test_cuda_fp16_overflow_does_not_advance_optimizer_or_warmup(
 		num_dense_layers=2)) if real_backbone else SmokeTestLM(32)).cuda()
 	config = replace(_train_config(), max_steps=3, precision="fp16", warmup_steps=2,
 					 gradient_accumulation_steps=2, max_grad_norm=0.1)
+	if real_backbone:
+		with torch.no_grad():
+			mla = model.layers[1].attn
+			mla.W_UQ.weight[:mla.d_head].mul_(1000)
+			mla.W_UKV.weight[:mla.d_head].mul_(1000)
 	optimizer = build_optimizer(model, config)
 	loaders = _loaders(prepared_data, config)
 	first = True
@@ -734,6 +744,8 @@ def test_cuda_fp16_overflow_does_not_advance_optimizer_or_warmup(
 	assert overflows[0]["step"] == 0 and overflows[0]["attempted_step"] == 1
 	assert overflows[0]["grad_norm"] is None and not overflows[0]["grad_norm_finite"]
 	updates = [record for record in records if record["event"] == "train"]
+	if real_backbone:
+		assert sum(record["qk_clip"]["clipped_head_updates"] for record in updates) > 0
 	assert sum(record["tokens"] for record in updates) == state.tokens_seen
 	assert sum(record["skipped_updates_in_window"] for record in updates) == state.skipped_updates
 	assert sum(record["nonfinite_grad_norms"] for record in updates) == state.skipped_updates

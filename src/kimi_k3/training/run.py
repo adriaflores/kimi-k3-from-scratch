@@ -12,6 +12,7 @@ from uuid import uuid4
 import numpy as np
 import torch
 
+from .qk_clip import qk_clip_metadata
 from .trainer import _model_config, _optimizer_layout, _runtime_signature
 
 
@@ -134,6 +135,7 @@ def start_run(*, model, optimizer, config, state, train_loader, val_loader,
 		"model_config": _model_config(model),
 		"parameter_count": sum(parameter.numel() for parameter in model.parameters()),
 		"train_config": asdict(config),
+		"qk_clip": qk_clip_metadata(model, threshold=config.qk_clip_threshold, chunk_size=config.qk_clip_chunk_size),
 		"optimizer": {
 			"type": f"{type(optimizer).__module__}.{type(optimizer).__qualname__}",
 			"layout": _optimizer_layout(model, optimizer),

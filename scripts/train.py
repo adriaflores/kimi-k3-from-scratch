@@ -74,10 +74,10 @@ def parse_args(argv=None):
 	parser.add_argument("--training-config", type=Path, help="Complete TrainConfig YAML; CLI values override it")
 	for name in ("batch_size", "seq_len", "max_steps", "log_interval", "eval_interval",
 				 "eval_batches", "checkpoint_interval", "gradient_accumulation_steps",
-				 "warmup_steps", "decay_steps", "seed", "muon_ns_steps"):
+				 "warmup_steps", "decay_steps", "seed", "muon_ns_steps", "qk_clip_chunk_size"):
 		parser.add_argument("--" + name.replace("_", "-"), type=int)
 	for name in ("learning_rate", "weight_decay", "adam_beta1", "adam_beta2", "adam_eps",
-				 "min_lr_ratio", "max_grad_norm", "muon_momentum"):
+				 "min_lr_ratio", "max_grad_norm", "muon_momentum", "qk_clip_threshold"):
 		parser.add_argument("--" + name.replace("_", "-"), type=float)
 	parser.add_argument("--adam-fused", action=argparse.BooleanOptionalAction, default=None)
 	parser.add_argument("--muon-ns-dtype", choices=("bf16", "fp32", "fp64"))
@@ -171,6 +171,8 @@ def main():
 	print(f"LR={config.learning_rate:g} | schedule={config.lr_schedule}"
 		  f" | warmup={config.warmup_steps} | decay end={config.decay_steps}"
 		  f" | min LR ratio={config.min_lr_ratio:g} | clipping={config.max_grad_norm:g}")
+	print(f"QK-Clip: MLA threshold={config.qk_clip_threshold:g} | score=QK/sqrt(d)"
+		  f" | query chunk={config.qk_clip_chunk_size}")
 	if args.smoke_test:
 		print("SMOKE TEST: toy model only; these are not Kimi K3 results.")
 	else:

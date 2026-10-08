@@ -1,0 +1,29 @@
+# Bounded integrated-recipe check; 64 updates, 16,384 nominal training tokens.
+# Local validation settings, not tuned 300M/6B pretraining hyperparameters.
+batch_size: 1
+seq_len: 128
+learning_rate: 0.0003
+weight_decay: 0.1
+max_steps: 64
+log_interval: 8
+eval_interval: 32
+eval_batches: 4
+checkpoint_interval: 32
+overfit_batch: true
+gradient_accumulation_steps: 2
+precision: fp32
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_eps: 1.0e-08
+adam_fused: true
+muon_momentum: 0.95
+muon_ns_steps: 5
+muon_ns_dtype: bf16
+qk_clip_threshold: 100.0
+qk_clip_chunk_size: 256
+lr_schedule: cosine
+warmup_steps: 8
+decay_steps: 64
+min_lr_ratio: 0.1
+max_grad_norm: 1.0
+seed: 1337

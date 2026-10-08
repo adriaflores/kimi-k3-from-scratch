@@ -61,6 +61,10 @@ class GatedMLA(nn.Module):
 		K_shared = K_shared.unsqueeze(1) # (B, 1, T, D_s)
 		K_shared = K_shared.expand(B, self.num_heads, T, self.d_shared) # (B, H, T, D_s)
 		K = torch.cat([K_c, K_shared], dim=-1) # (B, H, T, D + D_s)
+		# The trainer attaches a detached max-logit observer only for its lifetime. Evaluation and ordinary model calls collect no clip state.
+		observer = getattr(self, "_qk_clip_observer", None)
+		if observer is not None and self.training and torch.is_grad_enabled():
+			observer(Q, K)
 
 		# scores = (Q @ K.mT) # (B, H, T, T)
 		# raw_scores = (scores) / math.sqrt(self.d_head + self.d_shared)

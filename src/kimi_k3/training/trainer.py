@@ -20,6 +20,7 @@ from .monitoring import TrainingMonitor
 from .optimizers import MuonAdamW
 from .parameter_groups import build_parameter_groups
 from .profiling import TrainingProfiler
+from .qk_clip import QKClip, _chunk_size, _positive, qk_clip_metadata
 
 
 @dataclass
@@ -43,6 +44,8 @@ class TrainConfig:
 	muon_momentum: float = 0.95
 	muon_ns_steps: int = 5
 	muon_ns_dtype: str = "bf16"
+	qk_clip_threshold: float = 100.0
+	qk_clip_chunk_size: int = 256
 	lr_schedule: str = "constant"
 	warmup_steps: int = 0
 	decay_steps: int = 1000
@@ -71,6 +74,8 @@ class TrainConfig:
 			raise ValueError("muon_ns_steps must be a positive integer")
 		if self.muon_ns_dtype not in ("bf16", "fp32", "fp64"):
 			raise ValueError("muon_ns_dtype must be bf16, fp32 or fp64")
+		_positive("qk_clip_threshold", self.qk_clip_threshold)
+		_chunk_size(self.qk_clip_chunk_size)
 		if isinstance(self.warmup_steps, bool) or not isinstance(self.warmup_steps, int) or self.warmup_steps < 0:
 			raise ValueError("warmup_steps must be a nonnegative integer")
 		if isinstance(self.seed, bool) or not isinstance(self.seed, int) or not 0 <= self.seed < 2**32:
@@ -274,7 +279,7 @@ def save_checkpoint(path, model, optimizer, state: TrainState, config: TrainConf
 	path.parent.mkdir(parents=True, exist_ok=True)
 	temporary = path.with_name(path.name + ".tmp")
 	torch.save({
-		"format_version": 6,
+		"format_version": 7,
 		"model": model.state_dict(),
 		"optimizer": optimizer.state_dict(),
 		**asdict(state),
@@ -283,6 +288,7 @@ def save_checkpoint(path, model, optimizer, state: TrainState, config: TrainConf
 		"model_config": _model_config(model),
 		"optimizer_type": f"{type(optimizer).__module__}.{type(optimizer).__qualname__}",
 		"optimizer_layout": _optimizer_layout(model, optimizer),
+		"qk_clip": qk_clip_metadata(model, threshold=config.qk_clip_threshold, chunk_size=config.qk_clip_chunk_size),
 		"loaders": {"train": train_loader.state_dict(), "val": val_loader.state_dict()},
 		"rng_state": _capture_rng_state(device),
 		"runtime": _runtime_signature(model),
@@ -304,8 +310,10 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	version = checkpoint["format_version"]
 	if version in (3, 4, 5):
 		raise ValueError("Legacy AdamW checkpoints cannot resume the Muon recipe; start a new run")
-	if version != 6:
-		raise ValueError("Expected trainer checkpoint format_version=6")
+	if version == 6:
+		raise ValueError("Pre-clipping Muon checkpoints cannot resume QK-Clip; start a new run")
+	if version != 7:
+		raise ValueError("Expected trainer checkpoint format_version=7")
 	state = TrainState(
 		step=checkpoint["step"], tokens_seen=checkpoint["tokens_seen"],
 		overfit_batch_start=checkpoint["overfit_batch_start"],
@@ -321,7 +329,8 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	except (TypeError, ValueError) as error:
 		raise ValueError("Invalid training recipe in checkpoint") from error
 	for name in ("batch_size", "seq_len", "overfit_batch", "gradient_accumulation_steps",
-				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm", "adam_fused", "muon_ns_dtype"):
+				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm", "adam_fused", "muon_ns_dtype",
+				 "qk_clip_threshold", "qk_clip_chunk_size"):
 		if saved_config[name] != getattr(config, name):
 			raise ValueError(f"Incompatible {name} in checkpoint")
 	if config.lr_schedule == "cosine":
@@ -342,6 +351,10 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 		raise ValueError("Incompatible optimizer type in checkpoint")
 	if checkpoint["runtime"] != _runtime_signature(model):
 		raise ValueError("Incompatible runtime in checkpoint (version, device, dtype, threads or determinism)")
+	if checkpoint.get("qk_clip") != qk_clip_metadata(
+		model, threshold=config.qk_clip_threshold, chunk_size=config.qk_clip_chunk_size,
+	):
+		raise ValueError("Incompatible QK-Clip policy or attention geometry in checkpoint")
 	groups = checkpoint["optimizer"]["param_groups"]
 	if len(groups) != len(optimizer.param_groups) or any(
 		len(saved["params"]) != len(current["params"])
@@ -454,7 +467,8 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 	monitor = TrainingMonitor(device, metrics)
 	with TrainingProfiler(model, device, state, profile_config,
 						  directory=profile_dir, metrics=metrics) as profiling, \
-		 MoEDiagnostics(model, enabled=metrics is not None) as moe:
+		 MoEDiagnostics(model, enabled=metrics is not None) as moe, \
+		 QKClip(model, threshold=config.qk_clip_threshold, chunk_size=config.qk_clip_chunk_size) as qk_clip:
 		monitor.begin(state)
 		monitor.report("session_start", state,
 					   discarded_tail_bytes=metrics.discarded_tail_bytes if metrics is not None else 0,
@@ -462,6 +476,7 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 		monitor.resume_train()
 		consecutive_skips = 0
 		while state.step < config.max_steps:
+			qk_clip.reset()
 			step = state.step + 1
 			lr = learning_rate_at_step(config, step)
 			for group in optimizer.param_groups:
@@ -502,11 +517,17 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 					error_if_nonfinite=not scaler.is_enabled(),
 				).item()
 				previous_scale = scaler.get_scale()
+				qk_clip.validate()
 				scaler.step(optimizer)
 				scaler.update()
 				state.grad_scaler_state = scaler.state_dict() if scaler.is_enabled() else None
-				optimizer.zero_grad(set_to_none=True)
 				skipped = scaler.get_scale() < previous_scale
+				with profiling.region("train/qk_clip"):
+					if skipped:
+						qk_clip.reset()
+					else:
+						qk_clip.apply()
+				optimizer.zero_grad(set_to_none=True)
 			window.add(update_loss, update_tokens, grad_norm,
 					   skipped=skipped, max_grad_norm=config.max_grad_norm)
 			if skipped:
@@ -542,6 +563,7 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 					interval = monitor.interval_summary(window)
 					with profiling.region("train/report"):
 						monitor.report("train", state, **window.summary(lr), **interval,
+									   qk_clip=qk_clip.summary(reset=True),
 									   moe_diagnostics=moe,
 									   message=f"step {step} | train loss {window.loss_sum / window.tokens:.4f}"
 									   f" | lr {lr:.6g} | grad_norm {grad_norm:.4f}"

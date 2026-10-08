@@ -88,9 +88,11 @@ def test_cli_trains_and_saves_selected_model(prepared_data, tmp_path, smoke_test
 	assert session["checkpoint_path"] == str(checkpoint)
 	assert len(session["git"]["commit"]) == 40
 	saved = torch.load(checkpoint, map_location="cpu", weights_only=True)
-	assert saved["format_version"] == 6
+	assert saved["format_version"] == 7
 	assert saved["optimizer_type"].endswith(".MuonAdamW")
 	assert "Muon momentum=" in result.stdout
+	assert "QK-Clip: MLA threshold=100" in result.stdout
+	assert saved["qk_clip"] == session["qk_clip"]
 	assert {group["algorithm"] for group in saved["optimizer"]["param_groups"]} == (
 		{"adamw"} if smoke_test else {"muon", "adamw"})
 	assert saved["step"] == 2

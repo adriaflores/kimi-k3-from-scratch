@@ -113,6 +113,7 @@ def test_real_profile_is_bounded_and_preserves_training_state(
 	regions = {region["name"]: region for region in metadata["regions"]}
 	assert regions["train/forward"]["calls"] == regions["train/backward"]["calls"] == 4
 	assert regions["train/optimizer"]["calls"] == 2
+	assert regions["train/qk_clip"]["calls"] == 2
 	assert regions["model/StableLatentMoE"]["calls"] == 8
 	assert regions["model/KDAChunkwise"]["calls"] == 8
 	assert regions["model/GatedMLA"]["calls"] == 4
@@ -123,6 +124,7 @@ def test_real_profile_is_bounded_and_preserves_training_state(
 	names = {event.get("name", "") for event in trace["traceEvents"]}
 	assert {name for name in names if name.startswith("ProfilerStep#")} == {"ProfilerStep#2", "ProfilerStep#3"}
 	assert "aten::mm" in names
+	assert {"train/qk_clip", "attention/qk_clip_stats"} <= names
 	summary = (directory / "summary.txt").read_text(encoding="utf-8")
 	assert "Self CPU" in summary and "Self CPU Mem" in summary
 	if device == "cuda":

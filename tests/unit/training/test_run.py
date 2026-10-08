@@ -72,6 +72,9 @@ def test_run_records_provenance_without_changing_training_state(run_arguments):
 	assert session["environment"]["hardware"]["device"] == "cpu"
 	assert session["environment"]["hardware"]["gpu"] is None
 	assert session["rng_source"] == "seed"
+	assert session["qk_clip"]["policy"] == "mla_shared_key_v1"
+	assert session["qk_clip"]["threshold"] == 100.0
+	assert session["qk_clip"]["layers"][0]["name"] == "layers.1.attn"
 	assert session["resume_checkpoint"] is None
 	for name, value in weights.items():
 		torch.testing.assert_close(model.state_dict()[name], value, rtol=0, atol=0)

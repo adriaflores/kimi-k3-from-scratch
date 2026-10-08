@@ -110,6 +110,14 @@ def test_muon_cli_overrides_without_an_optimizer_selector():
 	assert not hasattr(args, "optimizer")
 
 
+def test_qk_clip_cli_overrides_the_fixed_positive_recipe():
+	args = parse_args(["--data-dir", "unused", "--smoke-test", "--qk-clip-threshold", "80",
+		"--qk-clip-chunk-size", "64"])
+	config = build_train_config(args)
+	assert (config.qk_clip_threshold, config.qk_clip_chunk_size) == (80.0, 64)
+	assert not hasattr(args, "qk_clip_enabled")
+
+
 @pytest.mark.parametrize("name,steps,accumulation,overfit", [
 	("smoke", 20, 1, False), ("overfit", 2000, 1, True), ("stability", 1000, 4, False)])
 def test_preset_loads_shared_yaml_schema_and_cli_overrides(name, steps, accumulation, overfit):
@@ -118,6 +126,7 @@ def test_preset_loads_shared_yaml_schema_and_cli_overrides(name, steps, accumula
 	assert (config.max_steps, config.gradient_accumulation_steps, config.overfit_batch) == (
 		steps, accumulation, overfit)
 	assert config.batch_size * config.seq_len * accumulation == 128 * accumulation
+	assert (config.qk_clip_threshold, config.qk_clip_chunk_size) == (100.0, 256)
 	args = parse_args(["--data-dir", "unused", "--smoke-test", "--training-config", str(path),
 					   "--max-steps", "3", "--batch-size", "2", "--no-overfit-batch"])
 	overridden = build_train_config(args)
@@ -134,6 +143,9 @@ def test_preset_loads_shared_yaml_schema_and_cli_overrides(name, steps, accumula
 	{"adam_beta2": 1.0}, {"max_grad_norm": float("nan")}, {"min_lr_ratio": -0.1},
 	{"muon_momentum": 1.0}, {"muon_momentum": float("nan")}, {"muon_momentum": True},
 	{"muon_ns_steps": 0}, {"muon_ns_steps": True}, {"muon_ns_steps": 1.5}, {"muon_ns_dtype": "fp16"},
+	{"qk_clip_threshold": 0}, {"qk_clip_threshold": -1}, {"qk_clip_threshold": True},
+	{"qk_clip_threshold": float("inf")}, {"qk_clip_threshold": float("nan")},
+	{"qk_clip_chunk_size": 0}, {"qk_clip_chunk_size": True}, {"qk_clip_chunk_size": 1.5},
 ])
 def test_invalid_recipe_is_rejected(kwargs):
 	with pytest.raises(ValueError):
