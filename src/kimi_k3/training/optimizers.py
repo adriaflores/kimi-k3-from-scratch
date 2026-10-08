@@ -1,0 +1,222 @@
+"""Single-device Muon with auxiliary AdamW and one PyTorch optimizer state.
+
+The Newton-Schulz kernel and momentum convention follow MoonshotAI/Moonlight
+and KellerJordan/Muon. The shape scaling follows Moonlight, Eq. (4), rather
+than the original Muon learning-rate convention. Upstream MIT notices and
+pinned source revisions are in references/muon/NOTICE.md.
+
+This module deliberately requires explicit parameter groups. Model-specific
+assignment, per-head views and attention weight clipping are separate stages.
+"""
+
+import math
+from collections.abc import Iterable
+
+import torch
+
+_NS_COEFFICIENTS = (3.4445, -4.7750, 2.0315)
+_NS_DTYPES = (torch.bfloat16, torch.float32, torch.float64)
+_PARAMETER_DTYPES = (torch.float32, torch.float64)
+
+
+def _nonnegative(name, value):
+	if isinstance(value, bool) or not isinstance(value, (int, float)):
+		raise TypeError(f"{name} must be a real number")
+	if not math.isfinite(value) or value < 0:
+		raise ValueError(f"{name} must be finite and nonnegative")
+
+
+def _validate_ns(steps, eps, dtype):
+	if isinstance(steps, bool) or not isinstance(steps, int) or steps < 1:
+		raise ValueError("ns_steps must be a positive integer")
+	_nonnegative("ns_eps", eps)
+	if eps == 0:
+		raise ValueError("ns_eps must be positive")
+	if dtype not in _NS_DTYPES:
+		raise ValueError("ns_dtype must be bfloat16, float32 or float64")
+
+
+@torch.no_grad()
+def zeropower_via_newton_schulz(matrix, *, steps=5, eps=1e-7,
+							   dtype=torch.bfloat16):
+	"""Apply Muon's quintic polynomial independently to the last two axes.
+
+	BF16 is the upstream working dtype; FP32/FP64 are useful for numerical
+	verification. Five iterations approximate polar orthogonalization: this
+	is not an exact SVD/polar factor and its singular values need not be one.
+	Leading axes denote independent matrices, never one flattened matrix.
+	The input tensor is not modified and ambient autocast is disabled.
+	"""
+	_validate_ns(steps, eps, dtype)
+	if not isinstance(matrix, torch.Tensor) or matrix.ndim < 2:
+		raise ValueError("Muon orthogonalization requires at least two dimensions")
+	if matrix.layout != torch.strided or not matrix.is_floating_point():
+		raise TypeError("Muon orthogonalization requires a dense real floating tensor")
+	if matrix.numel() == 0:
+		raise ValueError("Muon orthogonalization requires nonempty matrices")
+	with torch.autocast(device_type=matrix.device.type, enabled=False):
+		x = matrix.to(dtype=dtype)
+		transposed = x.size(-2) > x.size(-1)
+		if transposed:
+			x = x.mT
+		# The Frobenius norm bounds the spectral norm. Normalize each matrix.
+		x = x / (x.norm(dim=(-2, -1), keepdim=True) + eps)
+		a, b, c = _NS_COEFFICIENTS
+		for _ in range(steps):
+			gram = x @ x.mT
+			polynomial = b * gram + c * gram @ gram
+			x = a * x + polynomial @ x
+		return x.mT if transposed else x
+
+
+class MuonAdamW(torch.optim.Optimizer):
+	"""One optimizer with explicit ``algorithm='muon'`` / ``'adamw'`` groups.
+
+	Muon uses unnormalized SGD momentum, optional Nesterov, Newton-Schulz,
+	and the Moonlight factor ``0.2 * sqrt(max(rows, cols))``. Weight decay
+	uses the group's *unscaled* learning rate. A missing gradient skips both
+	decay and all state changes. A zero gradient is an ordinary active step.
+
+	Auxiliary groups use native torch.optim.AdamW, including its fused path.
+	The native optimizer shares the public groups and state of this object;
+	there is no second checkpoint or scheduler. Construct after moving the
+	model to its device. Parameters must be FP32 (or FP64 for verification);
+	BF16/FP16 training uses autocast and FP32 parameter storage.
+
+	Example::
+
+		optimizer = MuonAdamW([
+			{"params": hidden_matrices, "algorithm": "muon"},
+			{"params": auxiliary_parameters, "algorithm": "adamw"},
+		], lr=3e-4, weight_decay=0.1, adamw_fused=True)
+
+	No model parameters are assigned automatically. Muon parameters are 2D;
+	convolution flattening, fused-projection splitting and per-head routing
+	must be specified by the model integration, not inferred from rank.
+	"""
+
+	def __init__(self, param_groups: Iterable[dict], *, lr=3e-4,
+				 weight_decay=0.1, momentum=0.95, nesterov=True, ns_steps=5,
+				 ns_dtype=torch.bfloat16, betas=(0.9, 0.95), eps=1e-8,
+				 adamw_fused=True):
+		_nonnegative("lr", lr)
+		_nonnegative("weight_decay", weight_decay)
+		self._muon_defaults = {"momentum": momentum, "nesterov": nesterov,
+							   "ns_steps": ns_steps, "ns_dtype": ns_dtype}
+		self._adamw_defaults = {"betas": betas, "eps": eps, "fused": adamw_fused}
+		self._initializing = True
+		self._adamw = None
+		super().__init__(param_groups, {"lr": lr, "weight_decay": weight_decay})
+		self._initializing = False
+		self._bind_adamw()
+
+	def _validate_group(self, group):
+		algorithm = group.get("algorithm")
+		if algorithm not in ("muon", "adamw"):
+			raise ValueError("Each parameter group needs algorithm='muon' or 'adamw'")
+		_nonnegative("lr", group["lr"])
+		_nonnegative("weight_decay", group["weight_decay"])
+		if algorithm == "muon":
+			_nonnegative("momentum", group["momentum"])
+			if group["momentum"] >= 1:
+				raise ValueError("momentum must be in [0, 1)")
+			if not isinstance(group["nesterov"], bool):
+				raise TypeError("nesterov must be a bool")
+			_validate_ns(group["ns_steps"], 1e-7, group["ns_dtype"])
+		else:
+			betas = group["betas"]
+			if not isinstance(betas, (tuple, list)) or len(betas) != 2:
+				raise ValueError("betas must contain two values in [0, 1)")
+			for beta in betas:
+				_nonnegative("beta", beta)
+				if beta >= 1:
+					raise ValueError("betas must be in [0, 1)")
+			_nonnegative("eps", group["eps"])
+			if group["eps"] == 0:
+				raise ValueError("eps must be positive")
+			if not isinstance(group["fused"], bool):
+				raise TypeError("fused must be a bool")
+			# These variants change the supported recipe or execution contract.
+			for flag in ("amsgrad", "maximize", "capturable", "differentiable"):
+				if group.get(flag, False):
+					raise ValueError(f"AdamW {flag}=True is not supported")
+		for parameter in group["params"]:
+			if not isinstance(parameter, torch.Tensor):
+				raise TypeError("Parameter groups must contain tensors")
+			if parameter.dtype not in _PARAMETER_DTYPES or parameter.layout != torch.strided:
+				raise TypeError("MuonAdamW needs dense FP32/FP64 parameters; use autocast for mixed precision")
+			if algorithm == "muon" and (parameter.ndim != 2 or parameter.numel() == 0):
+				raise ValueError("Muon groups require nonempty 2D parameters")
+
+	def add_param_group(self, param_group):
+		"""Preserve input ordering and reject duplicates, including within a group."""
+		if not isinstance(param_group, dict):
+			raise TypeError("MuonAdamW requires explicit parameter-group dictionaries")
+		group = dict(param_group)
+		parameters = group["params"]
+		group["params"] = [parameters] if isinstance(parameters, torch.Tensor) else list(parameters)
+		algorithm = group.get("algorithm")
+		specific = self._muon_defaults if algorithm == "muon" else self._adamw_defaults
+		for name, value in {**self.defaults, **specific}.items():
+			group.setdefault(name, value)
+		self._validate_group(group)
+		identities = [id(parameter) for parameter in group["params"]]
+		existing = {id(parameter) for other in self.param_groups for parameter in other["params"]}
+		if len(identities) != len(set(identities)) or existing.intersection(identities):
+			raise ValueError("A parameter may occur only once across all optimizer groups")
+		super().add_param_group(group)
+		if not self._initializing:
+			self._bind_adamw()
+
+	def _bind_adamw(self):
+		"""Rebind after construction, adding groups, or loading canonical state."""
+		groups = [group for group in self.param_groups if group["algorithm"] == "adamw"]
+		self._adamw = torch.optim.AdamW(groups) if groups else None
+		if self._adamw is not None:
+			self._adamw.state = self.state
+
+	def load_state_dict(self, state_dict):
+		"""Keep auxiliary AdamW bound to the groups/state replaced by PyTorch."""
+		saved = state_dict["param_groups"]
+		if len(saved) != len(self.param_groups):
+			raise ValueError("Incompatible number of optimizer parameter groups")
+		for previous, current in zip(saved, self.param_groups):
+			if previous.get("algorithm") != current["algorithm"]:
+				raise ValueError("Incompatible optimizer group algorithms")
+			if len(previous["params"]) != len(current["params"]):
+				raise ValueError("Incompatible optimizer parameter-group sizes")
+			self._validate_group({**previous, "params": current["params"]})
+		super().load_state_dict(state_dict)
+		self._bind_adamw()
+
+	@torch.no_grad()
+	def step(self, closure=None):
+		loss = None
+		if closure is not None:
+			with torch.enable_grad():
+				loss = closure()
+		# Reject unsupported gradients before updating any group's parameters.
+		for group in self.param_groups:
+			for parameter in group["params"]:
+				if parameter.grad is not None and parameter.grad.layout != torch.strided:
+					raise RuntimeError("MuonAdamW does not support sparse gradients")
+		for group in self.param_groups:
+			if group["algorithm"] != "muon":
+				continue
+			for parameter in group["params"]:
+				gradient = parameter.grad
+				if gradient is None:
+					continue
+				state = self.state[parameter]
+				if not state:
+					state["momentum_buffer"] = torch.zeros_like(parameter)
+				buffer = state["momentum_buffer"]
+				buffer.mul_(group["momentum"]).add_(gradient)
+				update = gradient.add(buffer, alpha=group["momentum"]) if group["nesterov"] else buffer
+				update = zeropower_via_newton_schulz(update, steps=group["ns_steps"], dtype=group["ns_dtype"])
+				scale = 0.2 * math.sqrt(max(parameter.shape))
+				parameter.mul_(1 - group["lr"] * group["weight_decay"])
+				parameter.add_(update, alpha=-group["lr"] * scale)
+		if self._adamw is not None:
+			self._adamw.step()
+		return loss
