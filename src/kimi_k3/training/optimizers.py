@@ -6,11 +6,13 @@ than the original Muon learning-rate convention. Upstream MIT notices and
 pinned source revisions are in references/muon/NOTICE.md.
 
 This module requires explicit parameter groups. Model-specific assignment is
-in parameter_groups.py; weight clipping is a later stage.
+in parameter_groups.py; the trainer applies QK-Clip after successful updates.
 """
 
 import math
+import os
 from collections.abc import Iterable
+from functools import lru_cache
 
 import torch
 
@@ -36,9 +38,45 @@ def _validate_ns(steps, eps, dtype):
 		raise ValueError("ns_dtype must be bfloat16, float32 or float64")
 
 
+def _newton_schulz_core(matrix, steps, eps, dtype):
+	"""Pure tensor arithmetic shared by the eager and compiled routes."""
+	x = matrix.to(dtype=dtype)
+	transposed = x.size(-2) > x.size(-1)
+	if transposed:
+		x = x.mT
+	# The Frobenius norm bounds the spectral norm. Normalize each matrix.
+	x = x / (x.norm(dim=(-2, -1), keepdim=True) + eps)
+	a, b, c = _NS_COEFFICIENTS
+	for _ in range(steps):
+		gram = x @ x.mT
+		polynomial = b * gram + c * gram @ gram
+		x = a * x + polynomial @ x
+	return x.mT if transposed else x
+
+
+@lru_cache(maxsize=128)
+def _compiled_newton_schulz(shape, stride, device, input_dtype, steps, eps, dtype):
+	"""Cache a static full graph per layout, device and arithmetic setting.
+
+	Dynamo caches graphs on Python code objects, not function identities. Give
+	each specialization its own code object so the model's many matrix shapes
+	do not exhaust one function's recompile limit. This avoids changing global
+	compiler settings. Shape/stride/device/input_dtype are cache keys only.
+	Compiled functions are process-local and never enter optimizer state.
+	"""
+	def kernel(matrix):
+		return _newton_schulz_core(matrix, steps, eps, dtype)
+
+	kernel.__code__ = kernel.__code__.replace()
+	# Preserve eager BF16 truncation between fused pointwise operations. These
+	# casts remain inside the generated kernel, without extra launch boundaries.
+	return torch.compile(kernel, fullgraph=True, dynamic=False,
+		options={"emulate_precision_casts": True})
+
+
 @torch.no_grad()
 def zeropower_via_newton_schulz(matrix, *, steps=5, eps=1e-7,
-							   dtype=torch.bfloat16):
+							   dtype=torch.bfloat16, compiled=False):
 	"""Apply Muon's quintic polynomial independently to the last two axes.
 
 	BF16 is the upstream working dtype; FP32/FP64 are useful for numerical
@@ -46,8 +84,13 @@ def zeropower_via_newton_schulz(matrix, *, steps=5, eps=1e-7,
 	is not an exact SVD/polar factor and its singular values need not be one.
 	Leading axes denote independent matrices, never one flattened matrix.
 	The input tensor is not modified and ambient autocast is disabled.
+	``compiled=True`` lazily compiles just this core with TorchInductor. It is
+	also available on CPU for verification; the optimizer enables it on CUDA
+	only. Compilation errors propagate instead of silently using eager code.
 	"""
 	_validate_ns(steps, eps, dtype)
+	if not isinstance(compiled, bool):
+		raise TypeError("compiled must be a bool")
 	if not isinstance(matrix, torch.Tensor) or matrix.ndim < 2:
 		raise ValueError("Muon orthogonalization requires at least two dimensions")
 	if matrix.layout != torch.strided or not matrix.is_floating_point():
@@ -55,18 +98,13 @@ def zeropower_via_newton_schulz(matrix, *, steps=5, eps=1e-7,
 	if matrix.numel() == 0:
 		raise ValueError("Muon orthogonalization requires nonempty matrices")
 	with torch.autocast(device_type=matrix.device.type, enabled=False):
-		x = matrix.to(dtype=dtype)
-		transposed = x.size(-2) > x.size(-1)
-		if transposed:
-			x = x.mT
-		# The Frobenius norm bounds the spectral norm. Normalize each matrix.
-		x = x / (x.norm(dim=(-2, -1), keepdim=True) + eps)
-		a, b, c = _NS_COEFFICIENTS
-		for _ in range(steps):
-			gram = x @ x.mT
-			polynomial = b * gram + c * gram @ gram
-			x = a * x + polynomial @ x
-		return x.mT if transposed else x
+		if compiled:
+			if os.environ.get("TORCH_COMPILE_DISABLE") == "1":
+				raise RuntimeError("Compiled Muon requested with TORCH_COMPILE_DISABLE=1")
+			kernel = _compiled_newton_schulz(tuple(matrix.shape), tuple(matrix.stride()),
+				matrix.device, matrix.dtype, steps, eps, dtype)
+			return kernel(matrix)
+		return _newton_schulz_core(matrix, steps, eps, dtype)
 
 
 class MuonAdamW(torch.optim.Optimizer):
@@ -98,16 +136,18 @@ class MuonAdamW(torch.optim.Optimizer):
 	``(key_dim, value_dim)`` for MLA's interleaved K/V rows within each head.
 	Each part has independent normalization, NS iterations and shape scaling;
 	momentum and decay still belong to the original parameter exactly once.
+	``ns_compile=True`` compiles the NS core on CUDA; CPU execution stays eager.
+	It does not compile momentum, decay, AdamW, the scheduler or QK-Clip.
 	"""
 
 	def __init__(self, param_groups: Iterable[dict], *, lr=3e-4,
 				 weight_decay=0.1, momentum=0.95, nesterov=True, ns_steps=5,
-				 ns_dtype=torch.bfloat16, betas=(0.9, 0.95), eps=1e-8,
+				 ns_dtype=torch.bfloat16, ns_compile=False, betas=(0.9, 0.95), eps=1e-8,
 				 adamw_fused=True):
 		_nonnegative("lr", lr)
 		_nonnegative("weight_decay", weight_decay)
 		self._muon_defaults = {"momentum": momentum, "nesterov": nesterov,
-							   "ns_steps": ns_steps, "ns_dtype": ns_dtype}
+							   "ns_steps": ns_steps, "ns_dtype": ns_dtype, "ns_compile": ns_compile}
 		self._adamw_defaults = {"betas": betas, "eps": eps, "fused": adamw_fused}
 		self._initializing = True
 		self._adamw = None
@@ -128,6 +168,8 @@ class MuonAdamW(torch.optim.Optimizer):
 			if not isinstance(group["nesterov"], bool):
 				raise TypeError("nesterov must be a bool")
 			_validate_ns(group["ns_steps"], 1e-7, group["ns_dtype"])
+			if not isinstance(group["ns_compile"], bool):
+				raise TypeError("ns_compile must be a bool")
 			view = group.get("muon_shape")
 			if view is not None and (not isinstance(view, (tuple, list)) or len(view) < 2
 					or any(isinstance(size, bool) or not isinstance(size, int) or size < 1 for size in view)):
@@ -196,8 +238,18 @@ class MuonAdamW(torch.optim.Optimizer):
 		if self._adamw is not None:
 			self._adamw.state = self.state
 
+	@staticmethod
+	def _normalize_state_dict(state_dict):
+		"""Version-7 checkpoints written before compilation used the eager core."""
+		groups = [dict(group) for group in state_dict["param_groups"]]
+		for group in groups:
+			if group.get("algorithm") == "muon":
+				group.setdefault("ns_compile", False)
+		return {**state_dict, "param_groups": groups}
+
 	def load_state_dict(self, state_dict):
 		"""Keep auxiliary AdamW bound to the groups/state replaced by PyTorch."""
+		state_dict = self._normalize_state_dict(state_dict)
 		saved = state_dict["param_groups"]
 		if len(saved) != len(self.param_groups):
 			raise ValueError("Incompatible number of optimizer parameter groups")
@@ -207,6 +259,8 @@ class MuonAdamW(torch.optim.Optimizer):
 			if len(previous["params"]) != len(current["params"]):
 				raise ValueError("Incompatible optimizer parameter-group sizes")
 			self._validate_group({**previous, "params": current["params"]})
+			if previous.get("ns_compile") != current.get("ns_compile"):
+				raise ValueError("Incompatible Newton-Schulz compilation mode (ns_compile)")
 			for key in ("muon_shape", "muon_split_sizes"):
 				old, new = previous.get(key), current.get(key)
 				if (None if old is None else tuple(old)) != (None if new is None else tuple(new)):
@@ -240,16 +294,17 @@ class MuonAdamW(torch.optim.Optimizer):
 				update = gradient.add(buffer, alpha=group["momentum"]) if group["nesterov"] else buffer
 				shape = group.get("muon_shape") or parameter.shape
 				update = update.reshape(shape)
+				compiled = group["ns_compile"] and parameter.device.type == "cuda"
 				splits = group.get("muon_split_sizes")
 				if splits is None:
-					update = zeropower_via_newton_schulz(update, steps=group["ns_steps"], dtype=group["ns_dtype"])
+					update = zeropower_via_newton_schulz(update, steps=group["ns_steps"], dtype=group["ns_dtype"], compiled=compiled)
 					scale = 0.2 * math.sqrt(max(shape[-2:]))
 				else:
 					# Copy NS results into parameter precision before scaling. This
 					# also avoids updating a reshape copy of noncontiguous storage.
 					assembled = torch.empty(shape, dtype=parameter.dtype, device=parameter.device)
 					for part, destination in zip(update.split(splits, dim=-2), assembled.split(splits, dim=-2)):
-						destination.copy_(zeropower_via_newton_schulz(part, steps=group["ns_steps"], dtype=group["ns_dtype"]))
+						destination.copy_(zeropower_via_newton_schulz(part, steps=group["ns_steps"], dtype=group["ns_dtype"], compiled=compiled))
 						destination.mul_(0.2 * math.sqrt(max(part.shape[-2:])))
 					update, scale = assembled, 1.0
 				parameter.mul_(1 - group["lr"] * group["weight_decay"])

@@ -44,6 +44,7 @@ class TrainConfig:
 	muon_momentum: float = 0.95
 	muon_ns_steps: int = 5
 	muon_ns_dtype: str = "bf16"
+	muon_compile: bool = False
 	qk_clip_threshold: float = 100.0
 	qk_clip_chunk_size: int = 256
 	lr_schedule: str = "constant"
@@ -68,6 +69,8 @@ class TrainConfig:
 			raise TypeError("overfit_batch must be a bool")
 		if not isinstance(self.adam_fused, bool):
 			raise TypeError("adam_fused must be a bool")
+		if not isinstance(self.muon_compile, bool):
+			raise TypeError("muon_compile must be a bool")
 		if isinstance(self.muon_momentum, bool) or not math.isfinite(self.muon_momentum) or not 0 <= self.muon_momentum < 1:
 			raise ValueError("muon_momentum must be finite and in [0, 1)")
 		if isinstance(self.muon_ns_steps, bool) or not isinstance(self.muon_ns_steps, int) or self.muon_ns_steps < 1:
@@ -126,6 +129,7 @@ def build_optimizer(model, config: TrainConfig):
 		lr=config.learning_rate, weight_decay=config.weight_decay,
 		momentum=config.muon_momentum, nesterov=True, ns_steps=config.muon_ns_steps,
 		ns_dtype={"bf16": torch.bfloat16, "fp32": torch.float32, "fp64": torch.float64}[config.muon_ns_dtype],
+		ns_compile=config.muon_compile,
 		betas=(config.adam_beta1, config.adam_beta2), eps=config.adam_eps,
 		adamw_fused=config.adam_fused)
 
@@ -322,6 +326,9 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	)
 	# Validate structure before modifying model weights or optimizer state.
 	saved_config = checkpoint["train_config"]
+	if isinstance(saved_config, dict):
+		# The only added execution field has an explicit backwards-compatible default.
+		saved_config = {"muon_compile": False, **saved_config}
 	if not isinstance(saved_config, dict) or saved_config.keys() != asdict(config).keys():
 		raise ValueError("Incomplete or unknown training recipe fields in checkpoint")
 	try:
@@ -329,7 +336,7 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	except (TypeError, ValueError) as error:
 		raise ValueError("Invalid training recipe in checkpoint") from error
 	for name in ("batch_size", "seq_len", "overfit_batch", "gradient_accumulation_steps",
-				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm", "adam_fused", "muon_ns_dtype",
+				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm", "adam_fused", "muon_ns_dtype", "muon_compile",
 				 "qk_clip_threshold", "qk_clip_chunk_size"):
 		if saved_config[name] != getattr(config, name):
 			raise ValueError(f"Incompatible {name} in checkpoint")
@@ -355,7 +362,10 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 		model, threshold=config.qk_clip_threshold, chunk_size=config.qk_clip_chunk_size,
 	):
 		raise ValueError("Incompatible QK-Clip policy or attention geometry in checkpoint")
-	groups = checkpoint["optimizer"]["param_groups"]
+	optimizer_state = checkpoint["optimizer"]
+	if isinstance(optimizer, MuonAdamW):
+		optimizer_state = optimizer._normalize_state_dict(optimizer_state)
+	groups = optimizer_state["param_groups"]
 	if len(groups) != len(optimizer.param_groups) or any(
 		len(saved["params"]) != len(current["params"])
 		for saved, current in zip(groups, optimizer.param_groups)
@@ -370,6 +380,7 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 		splits = saved.get("muon_split_sizes")
 		if (saved["params"] != current["params"]
 				or saved.get("algorithm") != description["algorithm"]
+				or saved.get("ns_compile") != current.get("ns_compile")
 				or (None if view is None else tuple(view)) != description["muon_shape"]
 				or (None if splits is None else tuple(splits)) != description.get("muon_split_sizes")
 				or ("param_names" in current and saved.get("param_names") != current["param_names"])):
@@ -380,6 +391,7 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 			optimizer._validate_group({**saved, "params": expected["params"]})
 			if saved["algorithm"] == "muon":
 				expected.update(momentum=saved_config["muon_momentum"], nesterov=True,
+					ns_compile=saved_config["muon_compile"],
 					ns_steps=saved_config["muon_ns_steps"], ns_dtype={"bf16": torch.bfloat16,
 						"fp32": torch.float32, "fp64": torch.float64}[saved_config["muon_ns_dtype"]])
 			else:
@@ -399,7 +411,7 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 		if train_position != batch_end:
 			raise ValueError("Fixed batch offset does not match the saved training cursor")
 	model.load_state_dict(checkpoint["model"])
-	optimizer.load_state_dict(checkpoint["optimizer"])
+	optimizer.load_state_dict(optimizer_state)
 	optimizer.zero_grad(set_to_none=True)
 	for name in ("learning_rate", "weight_decay", "adam_beta1", "adam_beta2", "adam_eps",
 				 "muon_momentum", "muon_ns_steps"):

@@ -33,11 +33,11 @@ Validation uses a separate stream with different token IDs.
 | Forward/backward | Finite logits, loss and produced gradients; nonzero gradients and changed weights in every attention/FFN family, embeddings and final AttnRes projection. |
 | Next-token memorization | The trainer receives the exact shifted targets on every forward; fixed-batch loss `< 0.1` and all 128 next tokens predicted correctly. |
 | Evaluation | Separate validation loader; finite loss; model parameters/buffers, QB biases, training cursor and RNG preserved. |
-| Resume | Existing fresh-process tests compare continuous and interrupted training exactly: weights/QB, AdamW, scaler, counters, both cursors and RNG. Metrics retain the previous history and add a session. |
+| Resume | Existing fresh-process tests compare continuous and interrupted training exactly: weights/QB, Muon momentum, AdamW, scaler, counters, both cursors and RNG. Metrics retain the previous history and add a session. |
 
 The new learning test and CLI construction test use the shipped tiny YAML.
-The exact-resume regressions reuse their smaller mixed KDA/MLA/MoE test
-architecture; they cover both fixed and successive batches, FP32 and an
+The integrated-recipe regression also checks exact resume with the shipped tiny
+YAML. Additional resume regressions use a smaller mixed KDA/MLA/MoE architecture; they cover both fixed and successive batches, FP32 and an
 accumulated BF16 recipe. The RNG isolation regression also uses a stochastic
 model to test Python, NumPy and PyTorch RNG restoration on success and failure.
 
@@ -96,7 +96,7 @@ manifest = json.loads((directory / "run.json").read_text(encoding="utf-8"))
 records = [json.loads(line) for line in
            (directory / "metrics.jsonl").read_text(encoding="utf-8").splitlines()]
 saved = torch.load(directory / "last.pt", map_location="cpu", weights_only=True)
-assert saved["format_version"] == 4
+assert saved["format_version"] == 7
 assert saved["step"] == 40 and saved["tokens_seen"] == 5120
 assert saved["skipped_updates"] == 0
 assert saved["loaders"]["train"]["position"] == 5120

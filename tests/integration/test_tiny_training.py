@@ -40,6 +40,21 @@ def single_thread():
 		torch.set_num_threads(previous)
 
 
+@pytest.fixture
+def deterministic_execution(monkeypatch, device):
+	if device != "cuda":
+		yield
+		return
+	monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+	enabled = torch.are_deterministic_algorithms_enabled()
+	warn_only = torch.is_deterministic_algorithms_warn_only_enabled()
+	torch.use_deterministic_algorithms(True)
+	try:
+		yield
+	finally:
+		torch.use_deterministic_algorithms(enabled, warn_only=warn_only)
+
+
 def _prepare_data(directory):
 	directory.mkdir()
 	metadata = {
@@ -179,25 +194,28 @@ def _assert_checkpoint_equal(actual, expected):
 
 
 @pytest.mark.parametrize("precision", ["fp32", "bf16"])
-def test_shipped_tiny_integrated_recipe_learns_and_resumes_exactly(tmp_path, single_thread, precision):
+@pytest.mark.parametrize("muon_compile,device", [(False, "cpu"), (True, "cpu"),
+	pytest.param(True, "cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable"))])
+def test_shipped_tiny_integrated_recipe_learns_and_resumes_exactly(tmp_path, single_thread, precision,
+																   muon_compile, device, deterministic_execution):
 	# The full 64-update recipe is a separate measured experiment. Keep this
 	# regression at 16 updates, retaining its LR, accumulation and fixed horizon.
 	base = replace(load_config(REPO_ROOT / "configs/training/acceptance.yaml", TrainConfig),
-		max_steps=16, precision=precision)
+		max_steps=16, precision=precision, muon_compile=muon_compile)
 	data = _prepare_data(tmp_path / "data")
 
 	def execute(directory, config, *, checkpoint=None, seed=None):
 		torch.manual_seed(config.seed if seed is None else seed)
 		loaders = [TokenDataLoader(ShardedTokenDataset(data, split), config.batch_size, config.seq_len)
 			for split in ("train", "val")]
-		model = build_model(49152, config.seq_len, model_config_path=MODEL_CONFIG)
+		model = build_model(49152, config.seq_len, model_config_path=MODEL_CONFIG).to(device)
 		optimizer = build_optimizer(model, config)
 		state = (load_checkpoint(checkpoint, model, optimizer, config, vocab_size=49152,
 			train_loader=loaders[0], val_loader=loaders[1]) if checkpoint else TrainState())
 		run = start_run(model=model, optimizer=optimizer, config=config, state=state,
 			train_loader=loaders[0], val_loader=loaders[1], repo_root=REPO_ROOT, run_dir=directory)
 		with MetricsWriter(run) as metrics:
-			train(model, optimizer, *loaders, config, "cpu", state=state,
+			train(model, optimizer, *loaders, config, device, state=state,
 				checkpoint_path=run.checkpoint_path, metrics=metrics)
 		assert all(not hasattr(module, "_qk_clip_observer") for module in model.modules())
 		assert all(parameter.grad is None for parameter in model.parameters())
@@ -209,6 +227,7 @@ def test_shipped_tiny_integrated_recipe_learns_and_resumes_exactly(tmp_path, sin
 	_assert_checkpoint_equal(resumed, continuous)
 	assert resumed["format_version"] == 7
 	assert resumed["train_config"]["learning_rate"] == 3e-4
+	assert resumed["train_config"]["muon_compile"] == muon_compile
 	assert resumed["step"] == 16 and resumed["tokens_seen"] == 4096
 	assert resumed["qk_clip"]["threshold"] == 100.0
 	states = resumed["optimizer"]["state"].values()

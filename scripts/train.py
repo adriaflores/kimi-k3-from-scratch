@@ -80,6 +80,8 @@ def parse_args(argv=None):
 				 "min_lr_ratio", "max_grad_norm", "muon_momentum", "qk_clip_threshold"):
 		parser.add_argument("--" + name.replace("_", "-"), type=float)
 	parser.add_argument("--adam-fused", action=argparse.BooleanOptionalAction, default=None)
+	parser.add_argument("--muon-compile", action=argparse.BooleanOptionalAction, default=None,
+						help="Compile Newton-Schulz on CUDA; CPU keeps the eager reference")
 	parser.add_argument("--muon-ns-dtype", choices=("bf16", "fp32", "fp64"))
 	parser.add_argument("--precision", choices=("fp32", "bf16", "fp16"))
 	parser.add_argument("--lr-schedule", choices=("constant", "cosine"))
@@ -159,6 +161,8 @@ def main():
 	tokens_per_update = config.batch_size * config.seq_len * config.gradient_accumulation_steps
 	print(f"Muon momentum={config.muon_momentum} | Nesterov=True"
 		  f" | NS={config.muon_ns_steps} x {config.muon_ns_dtype}")
+	print(f"Muon NS backend={'compiled' if config.muon_compile and device.type == 'cuda' else 'eager'}"
+		  f" | muon_compile={config.muon_compile}")
 	print(f"Auxiliary AdamW betas=({config.adam_beta1}, {config.adam_beta2}) | eps={config.adam_eps:g}"
 		  f" | weight_decay={config.weight_decay:g} | precision={config.precision} | fused={config.adam_fused}")
 	for algorithm in ("muon", "adamw"):
