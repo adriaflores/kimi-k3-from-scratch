@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "torch_version": "2.11.0+cpu",
+  "flops_convention": "2 FLOPs/MAC; model fwd+bwd approx = 3*fwd; QK observer separate",
+  "exclusions": "pointwise/norm/softmax/quantile/routing/sorting/copies/optimizer/recompute/compilation/evaluation",
+  "memory_exclusions": "activations, temporary stacks/workspaces, allocator, CUDA runtime; not measured VRAM",
+  "models": [
+    {
+      "config": "configs/model/kimi_k3_proxy_82m.yaml",
+      "configured_kda_backend": "fused",
+      "counting_kda_backend": "chunkwise/meta",
+      "hidden_size": 320,
+      "layers": 13,
+      "kda_layers": 9,
+      "mla_layers": 4,
+      "kda_heads": 4,
+      "mla_heads": 4,
+      "total_parameters": 82221540,
+      "active_parameters_per_token": 33653220,
+      "non_embedding_parameters": 66492900,
+      "active_non_embedding_parameters": 17924580,
+      "components_total": {
+        "Tied embedding / LM head": 15728640,
+        "KDA": 8403876,
+        "Dense FFN": 1474560,
+        "Decoder norms + AttnRes": 24960,
+        "Stable LatentMoE": 54744960,
+        "Gated MLA": 1843584,
+        "Final norm + AttnRes": 960
+      },
+      "components_active": {
+        "Tied embedding / LM head": 15728640,
+        "KDA": 8403876,
+        "Dense FFN": 1474560,
+        "Decoder norms + AttnRes": 24960,
+        "Stable LatentMoE": 6176640,
+        "Gated MLA": 1843584,
+        "Final norm + AttnRes": 960
+      },
+      "optimizer_parameters": {
+        "muon": 66403584,
+        "adamw": 15817956
+      },
+      "parameter_bytes_fp32": 328886160,
+      "persistent_training_bytes_upper_bound": 1049930304,
+      "flops_per_token": [
+        {
+          "seq_len": 64,
+          "linear_forward": 67127808,
+          "conv_forward": 110592,
+          "kda_wy_core_forward_approx": 6045696.0,
+          "mla_attention_forward_dense": 655360,
+          "forward_approx": 73939456.0,
+          "forward_backward_approx": 221818368.0,
+          "qk_observer_forward_upper_bound": 393216,
+          "forward_backward_plus_qk_observer_upper_bound": 222211584.0
+        },
+        {
+          "seq_len": 128,
+          "linear_forward": 67127808,
+          "conv_forward": 110592,
+          "kda_wy_core_forward_approx": 6045696.0,
+          "mla_attention_forward_dense": 1310720,
+          "forward_approx": 74594816.0,
+          "forward_backward_approx": 223784448.0,
+          "qk_observer_forward_upper_bound": 786432,
+          "forward_backward_plus_qk_observer_upper_bound": 224570880.0
+        },
+        {
+          "seq_len": 256,
+          "linear_forward": 67127808,
+          "conv_forward": 110592,
+          "kda_wy_core_forward_approx": 6045696.0,
+          "mla_attention_forward_dense": 2621440,
+          "forward_approx": 75905536.0,
+          "forward_backward_approx": 227716608.0,
+          "qk_observer_forward_upper_bound": 1572864,
+          "forward_backward_plus_qk_observer_upper_bound": 229289472.0
+        },
+        {
+          "seq_len": 2048,
+          "linear_forward": 67127808,
+          "conv_forward": 110592,
+          "kda_wy_core_forward_approx": 6045696.0,
+          "mla_attention_forward_dense": 20971520,
+          "forward_approx": 94255616.0,
+          "forward_backward_approx": 282766848.0,
+          "qk_observer_forward_upper_bound": 12582912,
+          "forward_backward_plus_qk_observer_upper_bound": 295349760.0
+        }
+      ]
+    },
+    {
+      "config": "configs/model/kimi_k3_proxy_122m.yaml",
+      "configured_kda_backend": "fused",
+      "counting_kda_backend": "chunkwise/meta",
+      "hidden_size": 400,
+      "layers": 13,
+      "kda_layers": 9,
+      "mla_layers": 4,
+      "kda_heads": 5,
+      "mla_heads": 5,
+      "total_parameters": 122146637,
+      "active_parameters_per_token": 47151437,
+      "non_embedding_parameters": 102485837,
+      "active_non_embedding_parameters": 27490637,
+      "components_total": {
+        "Tied embedding / LM head": 19660800,
+        "KDA": 12812157,
+        "Dense FFN": 2304000,
+        "Decoder norms + AttnRes": 31200,
+        "Stable LatentMoE": 84482400,
+        "Gated MLA": 2854880,
+        "Final norm + AttnRes": 1200
+      },
+      "components_active": {
+        "Tied embedding / LM head": 19660800,
+        "KDA": 12812157,
+        "Dense FFN": 2304000,
+        "Decoder norms + AttnRes": 31200,
+        "Stable LatentMoE": 9487200,
+        "Gated MLA": 2854880,
+        "Final norm + AttnRes": 1200
+      },
+      "optimizer_parameters": {
+        "muon": 102374480,
+        "adamw": 19772157
+      },
+      "parameter_bytes_fp32": 488586548,
+      "persistent_training_bytes_upper_bound": 1544848272,
+      "flops_per_token": [
+        {
+          "seq_len": 64,
+          "linear_forward": 94080160,
+          "conv_forward": 138240,
+          "kda_wy_core_forward_approx": 7557120.0,
+          "mla_attention_forward_dense": 819200,
+          "forward_approx": 102594720.0,
+          "forward_backward_approx": 307784160.0,
+          "qk_observer_forward_upper_bound": 491520,
+          "forward_backward_plus_qk_observer_upper_bound": 308275680.0
+        },
+        {
+          "seq_len": 128,
+          "linear_forward": 94080160,
+          "conv_forward": 138240,
+          "kda_wy_core_forward_approx": 7557120.0,
+          "mla_attention_forward_dense": 1638400,
+          "forward_approx": 103413920.0,
+          "forward_backward_approx": 310241760.0,
+          "qk_observer_forward_upper_bound": 983040,
+          "forward_backward_plus_qk_observer_upper_bound": 311224800.0
+        },
+        {
+          "seq_len": 256,
+          "linear_forward": 94080160,
+          "conv_forward": 138240,
+          "kda_wy_core_forward_approx": 7557120.0,
+          "mla_attention_forward_dense": 3276800,
+          "forward_approx": 105052320.0,
+          "forward_backward_approx": 315156960.0,
+          "qk_observer_forward_upper_bound": 1966080,
+          "forward_backward_plus_qk_observer_upper_bound": 317123040.0
+        },
+        {
+          "seq_len": 2048,
+          "linear_forward": 94080160,
+          "conv_forward": 138240,
+          "kda_wy_core_forward_approx": 7557120.0,
+          "mla_attention_forward_dense": 26214400,
+          "forward_approx": 127989920.0,
+          "forward_backward_approx": 383969760.0,
+          "qk_observer_forward_upper_bound": 15728640,
+          "forward_backward_plus_qk_observer_upper_bound": 399698400.0
+        }
+      ]
+    },
+    {
+      "config": "configs/model/kimi_k3_300m.yaml",
+      "configured_kda_backend": "fused",
+      "counting_kda_backend": "chunkwise/meta",
+      "hidden_size": 640,
+      "layers": 13,
+      "kda_layers": 9,
+      "mla_layers": 4,
+      "kda_heads": 8,
+      "mla_heads": 8,
+      "total_parameters": 294676808,
+      "active_parameters_per_token": 100403528,
+      "non_embedding_parameters": 263219528,
+      "active_non_embedding_parameters": 68946248,
+      "components_total": {
+        "Tied embedding / LM head": 31457280,
+        "KDA": 31575240,
+        "Dense FFN": 5898240,
+        "Decoder norms + AttnRes": 49920,
+        "Stable LatentMoE": 218484480,
+        "Gated MLA": 7209728,
+        "Final norm + AttnRes": 1920
+      },
+      "components_active": {
+        "Tied embedding / LM head": 31457280,
+        "KDA": 31575240,
+        "Dense FFN": 5898240,
+        "Decoder norms + AttnRes": 49920,
+        "Stable LatentMoE": 24211200,
+        "Gated MLA": 7209728,
+        "Final norm + AttnRes": 1920
+      },
+      "optimizer_parameters": {
+        "muon": 263042048,
+        "adamw": 31634760
+      },
+      "parameter_bytes_fp32": 1178707232,
+      "persistent_training_bytes_upper_bound": 3662660736,
+      "flops_per_token": [
+        {
+          "seq_len": 64,
+          "linear_forward": 200452096,
+          "conv_forward": 221184,
+          "kda_wy_core_forward_approx": 12091392.0,
+          "mla_attention_forward_dense": 1310720,
+          "forward_approx": 214075392.0,
+          "forward_backward_approx": 642226176.0,
+          "qk_observer_forward_upper_bound": 786432,
+          "forward_backward_plus_qk_observer_upper_bound": 643012608.0
+        },
+        {
+          "seq_len": 128,
+          "linear_forward": 200452096,
+          "conv_forward": 221184,
+          "kda_wy_core_forward_approx": 12091392.0,
+          "mla_attention_forward_dense": 2621440,
+          "forward_approx": 215386112.0,
+          "forward_backward_approx": 646158336.0,
+          "qk_observer_forward_upper_bound": 1572864,
+          "forward_backward_plus_qk_observer_upper_bound": 647731200.0
+        },
+        {
+          "seq_len": 256,
+          "linear_forward": 200452096,
+          "conv_forward": 221184,
+          "kda_wy_core_forward_approx": 12091392.0,
+          "mla_attention_forward_dense": 5242880,
+          "forward_approx": 218007552.0,
+          "forward_backward_approx": 654022656.0,
+          "qk_observer_forward_upper_bound": 3145728,
+          "forward_backward_plus_qk_observer_upper_bound": 657168384.0
+        },
+        {
+          "seq_len": 2048,
+          "linear_forward": 200452096,
+          "conv_forward": 221184,
+          "kda_wy_core_forward_approx": 12091392.0,
+          "mla_attention_forward_dense": 41943040,
+          "forward_approx": 254707712.0,
+          "forward_backward_approx": 764123136.0,
+          "qk_observer_forward_upper_bound": 25165824,
+          "forward_backward_plus_qk_observer_upper_bound": 789288960.0
+        }
+      ]
+    }
+  ]
+}

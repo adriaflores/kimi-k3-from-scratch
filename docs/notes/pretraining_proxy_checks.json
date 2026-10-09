@@ -1,0 +1,721 @@
+{
+  "schema_version": 1,
+  "torch_version": "2.11.0+cpu",
+  "cuda_available": false,
+  "threads": 2,
+  "purpose": "full-shape plumbing check; synthetic losses are not research results",
+  "results": [
+    {
+      "config": "configs/model/kimi_k3_proxy_82m.yaml",
+      "config_sha256": "7b378a3f074143a1e01c8c408b58d95ee41043c7f4e36932b72d594428941487",
+      "status": "pass",
+      "device": "cpu",
+      "precision": "bf16",
+      "configured_backend": "fused",
+      "effective_model_config": {
+        "vocab_size": 49152,
+        "hidden_size": 320,
+        "num_layers": 13,
+        "rms_norm_eps": 1e-05,
+        "initializer_range": 0.02,
+        "max_seq_len": 2048,
+        "num_dense_layers": 1,
+        "attn_res_block_size": 2,
+        "layer_types": [
+          "kda",
+          "kda",
+          "kda",
+          "mla",
+          "kda",
+          "kda",
+          "kda",
+          "mla",
+          "kda",
+          "kda",
+          "kda",
+          "mla",
+          "mla"
+        ],
+        "kda_num_heads": 4,
+        "kda_head_dim": 128,
+        "kda_short_conv_kernel_size": 4,
+        "kda_gate_lower_bound": -5.0,
+        "kda_full_rank_output_gate": true,
+        "kda_chunk_size": 64,
+        "kda_implementation": "chunkwise",
+        "mla_num_heads": 4,
+        "mla_q_lora_rank": 64,
+        "mla_kv_lora_rank": 32,
+        "mla_qk_nope_head_dim": 128,
+        "mla_qk_shared_head_dim": 64,
+        "mla_v_head_dim": 128,
+        "mla_output_gate": true,
+        "dense_intermediate_size": 1536,
+        "num_experts": 64,
+        "num_experts_per_token": 2,
+        "num_shared_experts": 2,
+        "latent_moe_dim": 160,
+        "expert_intermediate_size": 136,
+        "latent_moe_use_norm": true,
+        "routed_scaling_factor": 1.0,
+        "moe_renormalize": true,
+        "situ_beta": 4.0,
+        "situ_linear_beta": 25.0
+      },
+      "effective_train_config": {
+        "batch_size": 1,
+        "seq_len": 64,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.1,
+        "max_steps": 2,
+        "log_interval": 1,
+        "eval_interval": 1,
+        "eval_batches": 1,
+        "checkpoint_interval": 1,
+        "overfit_batch": false,
+        "gradient_accumulation_steps": 2,
+        "precision": "bf16",
+        "adam_beta1": 0.9,
+        "adam_beta2": 0.95,
+        "adam_eps": 1e-08,
+        "adam_fused": true,
+        "muon_momentum": 0.95,
+        "muon_ns_steps": 5,
+        "muon_ns_dtype": "bf16",
+        "muon_compile": false,
+        "muon_batched": true,
+        "muon_batch_size": 32,
+        "muon_batch_max_mb": 64,
+        "qk_clip_threshold": 100.0,
+        "qk_clip_chunk_size": 256,
+        "lr_schedule": "cosine",
+        "warmup_steps": 0,
+        "decay_steps": 2,
+        "min_lr_ratio": 0.1,
+        "max_grad_norm": 1.0,
+        "seed": 1337
+      },
+      "synthetic_data": true,
+      "full_vocabulary": 49152,
+      "steps": 2,
+      "tokens_seen": 256,
+      "skipped_updates": 0,
+      "qk_clip_heads_per_update": 16,
+      "checkpoint_restore": "weights/QB/step/data cursor/RNG restored; continued successfully",
+      "evaluation_qb_frozen": true,
+      "parameters_finite": true,
+      "validation_loss_synthetic": 10.852081298828125,
+      "qk_clip_geometry": {
+        "policy": "mla_shared_key_v1",
+        "score": "causal_qk_over_sqrt_dim",
+        "threshold": 100.0,
+        "chunk_size": 256,
+        "layers": [
+          {
+            "name": "layers.3.attn",
+            "num_heads": 4,
+            "key_dim": 128,
+            "shared_dim": 64,
+            "value_dim": 128,
+            "query_rank": 64,
+            "kv_rank": 32
+          },
+          {
+            "name": "layers.7.attn",
+            "num_heads": 4,
+            "key_dim": 128,
+            "shared_dim": 64,
+            "value_dim": 128,
+            "query_rank": 64,
+            "kv_rank": 32
+          },
+          {
+            "name": "layers.11.attn",
+            "num_heads": 4,
+            "key_dim": 128,
+            "shared_dim": 64,
+            "value_dim": 128,
+            "query_rank": 64,
+            "kv_rank": 32
+          },
+          {
+            "name": "layers.12.attn",
+            "num_heads": 4,
+            "key_dim": 128,
+            "shared_dim": 64,
+            "value_dim": 128,
+            "query_rank": 64,
+            "kv_rank": 32
+          }
+        ]
+      },
+      "update_metrics": [
+        {
+          "step": 1,
+          "tokens_seen": 128,
+          "train_loss": 10.856052875518799,
+          "lr": 0.0003,
+          "grad_norm_mean": 28.180492401123047,
+          "grad_norm_max": 28.180492401123047,
+          "clipped_fraction": 1.0,
+          "nonfinite_grad_norms": 0,
+          "skipped_updates": 0,
+          "qk_clip": {
+            "threshold": 100.0,
+            "max_logit": 0.16774192452430725,
+            "clipped_head_updates": 0,
+            "observed_head_updates": 16,
+            "clipped_fraction": 0.0
+          },
+          "moe": {
+            "layers.1.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.07070428133010864
+            },
+            "layers.2.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.056664589792490005
+            },
+            "layers.3.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 0,
+              "qb_bias_abs_max": 0.05691789090633392
+            },
+            "layers.4.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.0616038516163826
+            },
+            "layers.5.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.0,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.058099694550037384
+            },
+            "layers.6.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.06330639123916626
+            },
+            "layers.7.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.0635850727558136
+            },
+            "layers.8.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.07216516137123108
+            },
+            "layers.9.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.08229508996009827
+            },
+            "layers.10.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.0,
+              "zero_load_experts": 0,
+              "qb_bias_abs_max": 0.06023038923740387
+            },
+            "layers.11.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 0,
+              "qb_bias_abs_max": 0.05154909938573837
+            },
+            "layers.12.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 0,
+              "qb_bias_abs_max": 0.06767793744802475
+            }
+          }
+        },
+        {
+          "step": 2,
+          "tokens_seen": 256,
+          "train_loss": 10.952276706695557,
+          "lr": 2.9999999999999997e-05,
+          "grad_norm_mean": 28.930517196655273,
+          "grad_norm_max": 28.930517196655273,
+          "clipped_fraction": 1.0,
+          "nonfinite_grad_norms": 0,
+          "skipped_updates": 0,
+          "qk_clip": {
+            "threshold": 100.0,
+            "max_logit": 0.14508627355098724,
+            "clipped_head_updates": 0,
+            "observed_head_updates": 16,
+            "clipped_fraction": 0.0
+          },
+          "moe": {
+            "layers.1.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 4,
+              "qb_bias_abs_max": 0.10280521214008331
+            },
+            "layers.2.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.05266915634274483
+            },
+            "layers.3.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 6,
+              "qb_bias_abs_max": 0.07349717617034912
+            },
+            "layers.4.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.05624968558549881
+            },
+            "layers.5.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.05207750201225281
+            },
+            "layers.6.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.75,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.09658560156822205
+            },
+            "layers.7.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.25,
+              "zero_load_experts": 3,
+              "qb_bias_abs_max": 0.07764800637960434
+            },
+            "layers.8.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 4.0,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.06051281467080116
+            },
+            "layers.9.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.5,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.06953372806310654
+            },
+            "layers.10.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.0,
+              "zero_load_experts": 3,
+              "qb_bias_abs_max": 0.07068430632352829
+            },
+            "layers.11.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.05600935220718384
+            },
+            "layers.12.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.75,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.07553257793188095
+            }
+          }
+        }
+      ],
+      "moe_counter_consistency": true
+    },
+    {
+      "config": "configs/model/kimi_k3_proxy_122m.yaml",
+      "config_sha256": "e32f57c54cee12083184d46483dbc61ad15968a658ae2bea0e36bb174f00aa99",
+      "status": "pass",
+      "device": "cpu",
+      "precision": "bf16",
+      "configured_backend": "fused",
+      "effective_model_config": {
+        "vocab_size": 49152,
+        "hidden_size": 400,
+        "num_layers": 13,
+        "rms_norm_eps": 1e-05,
+        "initializer_range": 0.02,
+        "max_seq_len": 2048,
+        "num_dense_layers": 1,
+        "attn_res_block_size": 2,
+        "layer_types": [
+          "kda",
+          "kda",
+          "kda",
+          "mla",
+          "kda",
+          "kda",
+          "kda",
+          "mla",
+          "kda",
+          "kda",
+          "kda",
+          "mla",
+          "mla"
+        ],
+        "kda_num_heads": 5,
+        "kda_head_dim": 128,
+        "kda_short_conv_kernel_size": 4,
+        "kda_gate_lower_bound": -5.0,
+        "kda_full_rank_output_gate": true,
+        "kda_chunk_size": 64,
+        "kda_implementation": "chunkwise",
+        "mla_num_heads": 5,
+        "mla_q_lora_rank": 80,
+        "mla_kv_lora_rank": 40,
+        "mla_qk_nope_head_dim": 128,
+        "mla_qk_shared_head_dim": 64,
+        "mla_v_head_dim": 128,
+        "mla_output_gate": true,
+        "dense_intermediate_size": 1920,
+        "num_experts": 64,
+        "num_experts_per_token": 2,
+        "num_shared_experts": 2,
+        "latent_moe_dim": 200,
+        "expert_intermediate_size": 168,
+        "latent_moe_use_norm": true,
+        "routed_scaling_factor": 1.0,
+        "moe_renormalize": true,
+        "situ_beta": 4.0,
+        "situ_linear_beta": 25.0
+      },
+      "effective_train_config": {
+        "batch_size": 1,
+        "seq_len": 64,
+        "learning_rate": 0.0003,
+        "weight_decay": 0.1,
+        "max_steps": 2,
+        "log_interval": 1,
+        "eval_interval": 1,
+        "eval_batches": 1,
+        "checkpoint_interval": 1,
+        "overfit_batch": false,
+        "gradient_accumulation_steps": 2,
+        "precision": "bf16",
+        "adam_beta1": 0.9,
+        "adam_beta2": 0.95,
+        "adam_eps": 1e-08,
+        "adam_fused": true,
+        "muon_momentum": 0.95,
+        "muon_ns_steps": 5,
+        "muon_ns_dtype": "bf16",
+        "muon_compile": false,
+        "muon_batched": true,
+        "muon_batch_size": 32,
+        "muon_batch_max_mb": 64,
+        "qk_clip_threshold": 100.0,
+        "qk_clip_chunk_size": 256,
+        "lr_schedule": "cosine",
+        "warmup_steps": 0,
+        "decay_steps": 2,
+        "min_lr_ratio": 0.1,
+        "max_grad_norm": 1.0,
+        "seed": 1337
+      },
+      "synthetic_data": true,
+      "full_vocabulary": 49152,
+      "steps": 2,
+      "tokens_seen": 256,
+      "skipped_updates": 0,
+      "qk_clip_heads_per_update": 20,
+      "checkpoint_restore": "weights/QB/step/data cursor/RNG restored; continued successfully",
+      "evaluation_qb_frozen": true,
+      "parameters_finite": true,
+      "validation_loss_synthetic": 10.929376602172852,
+      "qk_clip_geometry": {
+        "policy": "mla_shared_key_v1",
+        "score": "causal_qk_over_sqrt_dim",
+        "threshold": 100.0,
+        "chunk_size": 256,
+        "layers": [
+          {
+            "name": "layers.3.attn",
+            "num_heads": 5,
+            "key_dim": 128,
+            "shared_dim": 64,
+            "value_dim": 128,
+            "query_rank": 80,
+            "kv_rank": 40
+          },
+          {
+            "name": "layers.7.attn",
+            "num_heads": 5,
+            "key_dim": 128,
+            "shared_dim": 64,
+            "value_dim": 128,
+            "query_rank": 80,
+            "kv_rank": 40
+          },
+          {
+            "name": "layers.11.attn",
+            "num_heads": 5,
+            "key_dim": 128,
+            "shared_dim": 64,
+            "value_dim": 128,
+            "query_rank": 80,
+            "kv_rank": 40
+          },
+          {
+            "name": "layers.12.attn",
+            "num_heads": 5,
+            "key_dim": 128,
+            "shared_dim": 64,
+            "value_dim": 128,
+            "query_rank": 80,
+            "kv_rank": 40
+          }
+        ]
+      },
+      "update_metrics": [
+        {
+          "step": 1,
+          "tokens_seen": 128,
+          "train_loss": 10.87549877166748,
+          "lr": 0.0003,
+          "grad_norm_mean": 36.696895599365234,
+          "grad_norm_max": 36.696895599365234,
+          "clipped_fraction": 1.0,
+          "nonfinite_grad_norms": 0,
+          "skipped_updates": 0,
+          "qk_clip": {
+            "threshold": 100.0,
+            "max_logit": 0.2111152708530426,
+            "clipped_head_updates": 0,
+            "observed_head_updates": 20,
+            "clipped_fraction": 0.0
+          },
+          "moe": {
+            "layers.1.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.5,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.06483624875545502
+            },
+            "layers.2.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.08064764738082886
+            },
+            "layers.3.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.08951679617166519
+            },
+            "layers.4.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.25,
+              "zero_load_experts": 0,
+              "qb_bias_abs_max": 0.057233233004808426
+            },
+            "layers.5.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.0,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.06366477906703949
+            },
+            "layers.6.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.07222582399845123
+            },
+            "layers.7.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.0,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.05611103028059006
+            },
+            "layers.8.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.0,
+              "zero_load_experts": 4,
+              "qb_bias_abs_max": 0.0700344443321228
+            },
+            "layers.9.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.25,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.07663550972938538
+            },
+            "layers.10.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.06400880962610245
+            },
+            "layers.11.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.0,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.058672480285167694
+            },
+            "layers.12.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 0,
+              "qb_bias_abs_max": 0.06383805721998215
+            }
+          }
+        },
+        {
+          "step": 2,
+          "tokens_seen": 256,
+          "train_loss": 10.91841459274292,
+          "lr": 2.9999999999999997e-05,
+          "grad_norm_mean": 39.446834564208984,
+          "grad_norm_max": 39.446834564208984,
+          "clipped_fraction": 1.0,
+          "nonfinite_grad_norms": 0,
+          "skipped_updates": 0,
+          "qk_clip": {
+            "threshold": 100.0,
+            "max_logit": 0.22593070566654205,
+            "clipped_head_updates": 0,
+            "observed_head_updates": 20,
+            "clipped_fraction": 0.0
+          },
+          "moe": {
+            "layers.1.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.75,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.06366157531738281
+            },
+            "layers.2.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.75,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.06486640870571136
+            },
+            "layers.3.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.25,
+              "zero_load_experts": 0,
+              "qb_bias_abs_max": 0.06573998928070068
+            },
+            "layers.4.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.059098757803440094
+            },
+            "layers.5.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.0,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.0706186518073082
+            },
+            "layers.6.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.75,
+              "zero_load_experts": 3,
+              "qb_bias_abs_max": 0.09560269117355347
+            },
+            "layers.7.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 0,
+              "qb_bias_abs_max": 0.06034961715340614
+            },
+            "layers.8.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.25,
+              "zero_load_experts": 3,
+              "qb_bias_abs_max": 0.058087464421987534
+            },
+            "layers.9.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.25,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.0578218549489975
+            },
+            "layers.10.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 3.0,
+              "zero_load_experts": 3,
+              "qb_bias_abs_max": 0.04768957197666168
+            },
+            "layers.11.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 2.5,
+              "zero_load_experts": 1,
+              "qb_bias_abs_max": 0.07159557193517685
+            },
+            "layers.12.ffn": {
+              "tokens": 128,
+              "assignments": 256,
+              "max_load_over_mean": 4.0,
+              "zero_load_experts": 2,
+              "qb_bias_abs_max": 0.05957686901092529
+            }
+          }
+        }
+      ],
+      "moe_counter_consistency": true
+    }
+  ]
+}
