@@ -74,7 +74,8 @@ def parse_args(argv=None):
 	parser.add_argument("--training-config", type=Path, help="Complete TrainConfig YAML; CLI values override it")
 	for name in ("batch_size", "seq_len", "max_steps", "log_interval", "eval_interval",
 				 "eval_batches", "checkpoint_interval", "gradient_accumulation_steps",
-				 "warmup_steps", "decay_steps", "seed", "muon_ns_steps", "qk_clip_chunk_size"):
+				 "warmup_steps", "decay_steps", "seed", "muon_ns_steps", "qk_clip_chunk_size",
+				 "muon_batch_size", "muon_batch_max_mb"):
 		parser.add_argument("--" + name.replace("_", "-"), type=int)
 	for name in ("learning_rate", "weight_decay", "adam_beta1", "adam_beta2", "adam_eps",
 				 "min_lr_ratio", "max_grad_norm", "muon_momentum", "qk_clip_threshold"):
@@ -82,6 +83,8 @@ def parse_args(argv=None):
 	parser.add_argument("--adam-fused", action=argparse.BooleanOptionalAction, default=None)
 	parser.add_argument("--muon-compile", action=argparse.BooleanOptionalAction, default=None,
 						help="Compile Newton-Schulz on CUDA; CPU keeps the eager reference")
+	parser.add_argument("--muon-batched", action=argparse.BooleanOptionalAction, default=None,
+						help="Group compatible active Muon parameters in bounded matrix batches")
 	parser.add_argument("--muon-ns-dtype", choices=("bf16", "fp32", "fp64"))
 	parser.add_argument("--precision", choices=("fp32", "bf16", "fp16"))
 	parser.add_argument("--lr-schedule", choices=("constant", "cosine"))
@@ -163,6 +166,8 @@ def main():
 		  f" | NS={config.muon_ns_steps} x {config.muon_ns_dtype}")
 	print(f"Muon NS backend={'compiled' if config.muon_compile and device.type == 'cuda' else 'eager'}"
 		  f" | muon_compile={config.muon_compile}")
+	print(f"Muon grouping={'batched' if config.muon_batched else 'individual'}"
+		  f" | batch_size<={config.muon_batch_size} | temporary estimate budget={config.muon_batch_max_mb} MiB")
 	print(f"Auxiliary AdamW betas=({config.adam_beta1}, {config.adam_beta2}) | eps={config.adam_eps:g}"
 		  f" | weight_decay={config.weight_decay:g} | precision={config.precision} | fused={config.adam_fused}")
 	for algorithm in ("muon", "adamw"):

@@ -45,6 +45,9 @@ class TrainConfig:
 	muon_ns_steps: int = 5
 	muon_ns_dtype: str = "bf16"
 	muon_compile: bool = False
+	muon_batched: bool = False
+	muon_batch_size: int = 32
+	muon_batch_max_mb: int = 64
 	qk_clip_threshold: float = 100.0
 	qk_clip_chunk_size: int = 256
 	lr_schedule: str = "constant"
@@ -71,6 +74,12 @@ class TrainConfig:
 			raise TypeError("adam_fused must be a bool")
 		if not isinstance(self.muon_compile, bool):
 			raise TypeError("muon_compile must be a bool")
+		if not isinstance(self.muon_batched, bool):
+			raise TypeError("muon_batched must be a bool")
+		for name in ("muon_batch_size", "muon_batch_max_mb"):
+			value = getattr(self, name)
+			if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+				raise ValueError(f"{name} must be a positive integer")
 		if isinstance(self.muon_momentum, bool) or not math.isfinite(self.muon_momentum) or not 0 <= self.muon_momentum < 1:
 			raise ValueError("muon_momentum must be finite and in [0, 1)")
 		if isinstance(self.muon_ns_steps, bool) or not isinstance(self.muon_ns_steps, int) or self.muon_ns_steps < 1:
@@ -130,6 +139,8 @@ def build_optimizer(model, config: TrainConfig):
 		momentum=config.muon_momentum, nesterov=True, ns_steps=config.muon_ns_steps,
 		ns_dtype={"bf16": torch.bfloat16, "fp32": torch.float32, "fp64": torch.float64}[config.muon_ns_dtype],
 		ns_compile=config.muon_compile,
+		ns_batched=config.muon_batched, ns_batch_size=config.muon_batch_size,
+		ns_batch_max_bytes=config.muon_batch_max_mb * 1024**2,
 		betas=(config.adam_beta1, config.adam_beta2), eps=config.adam_eps,
 		adamw_fused=config.adam_fused)
 
@@ -327,8 +338,9 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	# Validate structure before modifying model weights or optimizer state.
 	saved_config = checkpoint["train_config"]
 	if isinstance(saved_config, dict):
-		# The only added execution field has an explicit backwards-compatible default.
-		saved_config = {"muon_compile": False, **saved_config}
+		# New execution fields have explicit defaults for older format-7 runs.
+		saved_config = {"muon_compile": False, "muon_batched": False,
+			"muon_batch_size": 32, "muon_batch_max_mb": 64, **saved_config}
 	if not isinstance(saved_config, dict) or saved_config.keys() != asdict(config).keys():
 		raise ValueError("Incomplete or unknown training recipe fields in checkpoint")
 	try:
@@ -337,6 +349,7 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 		raise ValueError("Invalid training recipe in checkpoint") from error
 	for name in ("batch_size", "seq_len", "overfit_batch", "gradient_accumulation_steps",
 				 "precision", "lr_schedule", "warmup_steps", "max_grad_norm", "adam_fused", "muon_ns_dtype", "muon_compile",
+				 "muon_batched", "muon_batch_size", "muon_batch_max_mb",
 				 "qk_clip_threshold", "qk_clip_chunk_size"):
 		if saved_config[name] != getattr(config, name):
 			raise ValueError(f"Incompatible {name} in checkpoint")
@@ -381,6 +394,8 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 		if (saved["params"] != current["params"]
 				or saved.get("algorithm") != description["algorithm"]
 				or saved.get("ns_compile") != current.get("ns_compile")
+				or any(saved.get(name) != current.get(name) for name in
+					("ns_batched", "ns_batch_size", "ns_batch_max_bytes"))
 				or (None if view is None else tuple(view)) != description["muon_shape"]
 				or (None if splits is None else tuple(splits)) != description.get("muon_split_sizes")
 				or ("param_names" in current and saved.get("param_names") != current["param_names"])):
@@ -392,6 +407,8 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 			if saved["algorithm"] == "muon":
 				expected.update(momentum=saved_config["muon_momentum"], nesterov=True,
 					ns_compile=saved_config["muon_compile"],
+					ns_batched=saved_config["muon_batched"], ns_batch_size=saved_config["muon_batch_size"],
+					ns_batch_max_bytes=saved_config["muon_batch_max_mb"] * 1024**2,
 					ns_steps=saved_config["muon_ns_steps"], ns_dtype={"bf16": torch.bfloat16,
 						"fp32": torch.float32, "fp64": torch.float64}[saved_config["muon_ns_dtype"]])
 			else:

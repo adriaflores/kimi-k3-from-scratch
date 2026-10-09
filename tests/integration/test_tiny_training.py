@@ -194,14 +194,17 @@ def _assert_checkpoint_equal(actual, expected):
 
 
 @pytest.mark.parametrize("precision", ["fp32", "bf16"])
-@pytest.mark.parametrize("muon_compile,device", [(False, "cpu"), (True, "cpu"),
-	pytest.param(True, "cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable"))])
+@pytest.mark.parametrize("muon_compile,muon_batched,device", [(False, False, "cpu"), (True, False, "cpu"),
+	(False, True, "cpu"),
+	pytest.param(True, False, "cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable")),
+	pytest.param(True, True, "cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable"))])
 def test_shipped_tiny_integrated_recipe_learns_and_resumes_exactly(tmp_path, single_thread, precision,
-																   muon_compile, device, deterministic_execution):
+																   muon_compile, muon_batched, device, deterministic_execution):
 	# The full 64-update recipe is a separate measured experiment. Keep this
 	# regression at 16 updates, retaining its LR, accumulation and fixed horizon.
 	base = replace(load_config(REPO_ROOT / "configs/training/acceptance.yaml", TrainConfig),
-		max_steps=16, precision=precision, muon_compile=muon_compile)
+		max_steps=16, precision=precision, muon_compile=muon_compile,
+		muon_batched=muon_batched, muon_batch_size=2)
 	data = _prepare_data(tmp_path / "data")
 
 	def execute(directory, config, *, checkpoint=None, seed=None):
@@ -228,6 +231,7 @@ def test_shipped_tiny_integrated_recipe_learns_and_resumes_exactly(tmp_path, sin
 	assert resumed["format_version"] == 7
 	assert resumed["train_config"]["learning_rate"] == 3e-4
 	assert resumed["train_config"]["muon_compile"] == muon_compile
+	assert resumed["train_config"]["muon_batched"] == muon_batched
 	assert resumed["step"] == 16 and resumed["tokens_seen"] == 4096
 	assert resumed["qk_clip"]["threshold"] == 100.0
 	states = resumed["optimizer"]["state"].values()
@@ -245,7 +249,8 @@ def test_shipped_tiny_integrated_recipe_learns_and_resumes_exactly(tmp_path, sin
 	continuation = summarize_run(resumed_run.directory, expected_step=16)
 	assert continuation["start_step"] == 8 and continuation["logged_updates"] == 8
 	print("tiny_hybrid_recipe: " + json.dumps({
-		"precision": precision, "updates": result["logged_updates"], "tokens": result["logged_tokens"],
+		"precision": precision, "batched": muon_batched,
+		"updates": result["logged_updates"], "tokens": result["logged_tokens"],
 		"first_window_loss": result["first_logged_train_loss"], "last_window_loss": result["last_logged_train_loss"],
 		"qk_max_logit": result["qk_clip"]["max_logit"], "exact_resume": True,
 	}))

@@ -10,8 +10,10 @@ Only the tensor arithmetic of Newton–Schulz is compiled with
 `torch.compile(fullgraph=True, dynamic=False)`. The five iterations, coefficients,
 per-matrix Frobenius normalization, BF16 working precision and logical matrix
 views are retained. Momentum, Nesterov, shape scaling, weight decay, AdamW,
-gradient handling and post-step QK-Clip remain outside that graph. This stage
-does not group different parameters or change expert execution.
+gradient handling and post-step QK-Clip remain outside that graph. Individual
+execution remains available. The second phase adds
+[bounded parameter batching and foreach updates](muon_batched.md), independently
+selected with `--muon-batched`; expert forward execution is unchanged.
 
 The per-call Inductor option `emulate_precision_casts=True` retains the BF16
 rounding boundaries of eager pointwise operations inside fused kernels. This
@@ -52,13 +54,17 @@ Commands use Bash line continuations; in PowerShell put each command on one line
 or use PowerShell's continuation syntax. If checking tooling first, substitute
 `configs/model/kimi_k3_tiny.yaml`.
 
+The default `--compare compile` retains the individual eager/compiled
+comparison above. `--compare batch` compares individual compiled execution with
+batched compiled execution; see the [batching guide](muon_batched.md).
+
 The benchmark constructs the real parameter grouping and times complete
 `MuonAdamW.step` calls with fixed synthetic gradients for **all parameters**.
 Both modes start from identical generated weights/gradients and fresh state;
 one mode occupies GPU memory at a time. First-step time (including lazy
 compilation/state allocation) is reported separately from warm measurements.
 The JSON includes synchronized wall medians, CUDA-event medians, peak memory,
-compile-cache counts and the wall-time speedup. CUDA events also include gaps
+compile-cache counts, NS calls per update and the wall-time speedup. CUDA events also include gaps
 between launches; synchronized wall time is the main optimizer comparison.
 After timing it verifies eager/compiled BF16 outputs for every logical shape and
 stride (including K/V slices) with `rtol=0.03, atol=0.03`, recording maximum

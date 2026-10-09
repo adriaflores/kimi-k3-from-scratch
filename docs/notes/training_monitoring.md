@@ -357,3 +357,8 @@ Keep the eager/compiled runs unprofiled and discard compilation/warmup windows.
 See [the benchmark and 4050 commands](muon_compile.md). The integrated
 [Muon + QK-Clip recipe](muon_recipe.md) uses checkpoint format 7; the compilation
 setting is recorded in the manifest and must match when resuming.
+
+The second optimization phase adds `--muon-batched`. The manifest also records
+batching and its chunk limits; all three must match on resume. Compare a fresh
+batched run against the individual compiled baseline with the same recipe and
+discard compilation/warmup windows. See [the batched Muon comparison](muon_batched.md).

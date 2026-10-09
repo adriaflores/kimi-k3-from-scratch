@@ -289,7 +289,8 @@ def test_loader_resume_accepts_relocated_manifest_with_different_json_formatting
 
 @pytest.mark.parametrize("case", ["batch_size", "seq_len", "overfit_batch", "manifest", "cursor", "legacy",
 	"gradient_accumulation_steps", "precision", "lr_schedule", "warmup_steps", "max_grad_norm",
-	"decay_steps", "min_lr_ratio", "adam_fused", "muon_ns_dtype", "muon_compile", "qk_clip_threshold", "qk_clip_chunk_size"])
+	"decay_steps", "min_lr_ratio", "adam_fused", "muon_ns_dtype", "muon_compile",
+	"muon_batched", "muon_batch_size", "muon_batch_max_mb", "qk_clip_threshold", "qk_clip_chunk_size"])
 def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tmp_path, case):
 	_seed(123)
 	model = StochasticLM()
@@ -305,7 +306,8 @@ def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tm
 	incompatible = {"batch_size": 1, "seq_len": 4, "overfit_batch": True,
 					"gradient_accumulation_steps": 2, "precision": "bf16", "lr_schedule": "cosine",
 					"warmup_steps": 1, "max_grad_norm": 0.1, "decay_steps": 1001, "min_lr_ratio": 0.2,
-					"adam_fused": False, "muon_ns_dtype": "fp32", "muon_compile": True, "qk_clip_threshold": 80.0,
+					"adam_fused": False, "muon_ns_dtype": "fp32", "muon_compile": True,
+					"muon_batched": True, "muon_batch_size": 16, "muon_batch_max_mb": 32, "qk_clip_threshold": 80.0,
 					"qk_clip_chunk_size": 64}
 	if case in incompatible:
 		config = replace(config, **{case: incompatible[case]})
@@ -422,11 +424,12 @@ def test_hybrid_checkpoint_rejects_changed_assignment_before_mutation(
 	_assert_equal(torch.get_rng_state(), rng_before[2])
 
 
-def test_existing_format7_eager_checkpoint_resumes_exactly_without_new_compile_fields(
-	prepared_data, tmp_path, kda_config_factory,
+@pytest.mark.parametrize("legacy_batch_fields,compile_mode", [(False, False), (True, False), (True, True)])
+def test_existing_format7_checkpoint_resumes_exactly_without_new_execution_fields(
+	prepared_data, tmp_path, kda_config_factory, legacy_batch_fields, compile_mode,
 ):
 	architecture = kda_config_factory(num_layers=2, layer_types=("kda", "mla"), num_dense_layers=1)
-	config = replace(_train_config(), max_steps=2, weight_decay=0.1)
+	config = replace(_train_config(), max_steps=2, weight_decay=0.1, muon_compile=compile_mode)
 
 	def construct(seed, recipe):
 		_seed(seed)
@@ -440,10 +443,18 @@ def test_existing_format7_eager_checkpoint_resumes_exactly_without_new_compile_f
 	path = tmp_path / "existing_format7.pt"
 	train(partial, partial_optimizer, *partial_loaders, partial_config, "cpu", checkpoint_path=path)
 	saved = torch.load(path, weights_only=True)
-	saved["train_config"].pop("muon_compile")
+	if not compile_mode:
+		saved["train_config"].pop("muon_compile")
+	if legacy_batch_fields:
+		for name in ("muon_batched", "muon_batch_size", "muon_batch_max_mb"):
+			saved["train_config"].pop(name)
 	for group in saved["optimizer"]["param_groups"]:
 		if group["algorithm"] == "muon":
-			group.pop("ns_compile")
+			if not compile_mode:
+				group.pop("ns_compile")
+			if legacy_batch_fields:
+				for name in ("ns_batched", "ns_batch_size", "ns_batch_max_bytes"):
+					group.pop(name)
 	torch.save(saved, path)
 	resumed, resumed_optimizer, resumed_loaders = construct(999, config)
 	state = load_checkpoint(path, resumed, resumed_optimizer, config, vocab_size=32,
@@ -524,9 +535,9 @@ def test_hybrid_resume_restores_all_hyperparameters_even_after_zero_decay_build(
 
 
 @pytest.mark.parametrize("overfit", [False, True])
-@pytest.mark.parametrize("use_recipe", [False, True])
+@pytest.mark.parametrize("use_recipe,batched", [(False, False), (True, False), (True, True)])
 def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_path,
-														  kda_config_factory, overfit, use_recipe):
+														  kda_config_factory, overfit, use_recipe, batched):
 	architecture = kda_config_factory(num_layers=4, layer_types=("kda", "kda", "kda", "mla"),
 									 num_dense_layers=1, attn_res_block_size=2,
 									 num_experts=4, num_experts_per_token=2,
@@ -536,7 +547,8 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 	recipe_path = tmp_path / "train.yaml"
 	recipe = replace(_train_config(), gradient_accumulation_steps=2, precision="bf16",
 					 lr_schedule="cosine", warmup_steps=2, decay_steps=5,
-					 max_grad_norm=0.1, weight_decay=0.1)
+					 max_grad_norm=0.1, weight_decay=0.1,
+					 muon_batched=batched, muon_batch_size=2 if batched else 32)
 	recipe_path.write_text(yaml.safe_dump(asdict(recipe)), encoding="utf-8")
 
 	def run(max_steps, checkpoint, *, resume=None, seed=123):
@@ -552,6 +564,8 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 			args.append("--overfit-batch")
 		if use_recipe:
 			args.extend(["--training-config", str(recipe_path)])
+		if batched:
+			args.extend(["--muon-batched", "--muon-batch-size", "2"])
 		if resume is not None:
 			# Saved optimizer settings must win, including in the run manifest.
 			args.extend(["--resume", str(resume), "--learning-rate", "0.5",
@@ -580,6 +594,7 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 	assert session["start_state"]["tokens_seen"] == partial["tokens_seen"]
 	assert session["start_state"]["loaders"] == partial["loaders"]
 	assert session["train_config"]["max_steps"] == 5
+	assert session["train_config"]["muon_batched"] == batched
 	assert session["train_config"]["learning_rate"] == partial["train_config"]["learning_rate"]
 	for name in ("adam_beta1", "adam_beta2", "adam_eps", "weight_decay", "muon_momentum", "muon_ns_steps"):
 		assert session["train_config"][name] == partial["train_config"][name]
@@ -612,6 +627,7 @@ def test_cli_resume_in_fresh_process_matches_continuous_run(prepared_data, tmp_p
 	assert resumed["qk_clip"] == continuous["qk_clip"]
 	assert sum(record["qk_clip"]["clipped_head_updates"] for record in records if record["event"] == "train") > 0
 	assert resumed["train_config"]["gradient_accumulation_steps"] == (2 if use_recipe else 1)
+	assert resumed["train_config"]["muon_batched"] == batched
 	for key in ("model", "optimizer", "loaders", "rng_state", "step", "tokens_seen", "overfit_batch_start",
 				"skipped_updates", "grad_scaler_state"):
 		_assert_equal(resumed[key], continuous[key])

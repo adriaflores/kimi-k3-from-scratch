@@ -52,12 +52,23 @@ microbatches, weight decay `0.1`, eight warmup updates and a fixed 64-update cos
 horizon. It is a bounded integration check, not tuned pretraining hyperparameters.
 `smoke`, `overfit` and `stability` use the same optimizer/clipping recipe.
 
+Execution settings are separate from the mathematical recipe. `muon_compile`
+selects compiled NS on CUDA; `muon_batched` groups compatible active parameters
+while preserving each logical matrix's normalization and scale. Both default
+to `false`. The batch defaults are at most 32 parameters per chunk and a 64 MiB
+temporary-storage estimate, configured with `muon_batch_size` and
+`muon_batch_max_mb`. All shipped YAMLs include these fields; custom complete
+training YAMLs must include them too. CLI overrides use the same names with
+hyphens. See [batched Muon](muon_batched.md) for memory and comparison details.
+
 Checkpoint format **7** saves the hybrid state, clipping policy/geometry,
 precision, recipe, counters, loader positions and RNG. Legacy AdamW and
 pre-clipping Muon checkpoints are rejected. Existing format-7 eager checkpoints
 remain compatible: an absent `muon_compile`/`ns_compile` means `false`.
-The requested compilation mode must match on resume. Compiled kernels are
-process-local and rebuilt lazily; they are not checkpoint contents.
+Absent batch fields default to individual execution with limits of 32 and
+64 MiB. Requested compilation, batching and both batch limits must match on
+resume. Compiled kernels and packed chunks are process-local and rebuilt;
+checkpoints retain ordinary per-parameter momentum and AdamW state.
 
 The shipped tiny regression checks next-token learning, evaluation isolation,
 accumulated FP32/BF16 training and exact same-backend resume. CUDA cases run when

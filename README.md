@@ -124,6 +124,15 @@ Compilation is lazy, cached per matrix layout, and preserves the five iterations
 independent normalization and update scaling. Initial compilation can take
 minutes. See [the optimizer benchmark and 4050 comparison](docs/notes/muon_compile.md).
 
+Add `--muon-batched` to group compatible active Muon parameters and use `foreach`
+for momentum and weight updates. Each parameter, gate/up matrix and attention
+head retains its own NS normalization. `muon_batched: false` remains the default
+pending the target GPU comparison. `muon_batch_size: 32` and
+`muon_batch_max_mb: 64` bound chunk size using a conservative temporary-storage
+estimate; the latter is not a limit on total GPU memory. Combine batching with
+`--muon-compile` for the second optimization phase. See
+[batched Muon and its single 4050 training comparison](docs/notes/muon_batched.md).
+
 For direct Python calls to `train`, a fresh optimizer's initial LR supplies
 the schedule's peak. The CLI constructs that optimizer from the recipe.
 
@@ -199,10 +208,13 @@ number of successful updates, including the saved steps. Saved optimizer
 hyperparameters override CLI learning rate, weight decay, betas, epsilon, Muon
 momentum and NS iteration count. The parameter-group layout must match, including
 canonical names, shapes, dtypes and declared matrix views. Group separation stays
-stable when weight decay is zero. `adam_fused`, `muon_ns_dtype` and
-`muon_compile` must match. Format-7 checkpoints from before compilation default
-to the eager mode and still resume with `--no-muon-compile`. Compiled functions
-are rebuilt lazily after resume and are not serialized.
+stable when weight decay is zero. `adam_fused`, `muon_ns_dtype`, `muon_compile`,
+`muon_batched`, `muon_batch_size` and `muon_batch_max_mb` must match. Format-7
+checkpoints from before compilation default to eager NS; checkpoints from
+before batching default to individual execution with limits of 32 and 64 MiB.
+Resume those runs with the corresponding modes, and start a fresh run to
+compare batching. Compiled functions and packed temporary tensors are rebuilt
+after resume and are not serialized.
 The LR schedule is derived from the restored step and saved base LR; it has
 no separate mutable scheduler object. `decay_steps` fixes its horizon and must
 match on resume, even when a first segment uses a smaller `max_steps`.

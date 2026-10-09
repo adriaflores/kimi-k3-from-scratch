@@ -147,6 +147,8 @@ def test_preset_loads_shared_yaml_schema_and_cli_overrides(name, steps, accumula
 	{"qk_clip_threshold": 0}, {"qk_clip_threshold": -1}, {"qk_clip_threshold": True},
 	{"qk_clip_threshold": float("inf")}, {"qk_clip_threshold": float("nan")},
 	{"qk_clip_chunk_size": 0}, {"qk_clip_chunk_size": True}, {"qk_clip_chunk_size": 1.5},
+	{"muon_batch_size": 0}, {"muon_batch_size": True}, {"muon_batch_size": 1.5},
+	{"muon_batch_max_mb": 0}, {"muon_batch_max_mb": True},
 ])
 def test_invalid_recipe_is_rejected(kwargs):
 	with pytest.raises(ValueError):
@@ -169,6 +171,22 @@ def test_muon_compile_cli_and_config_reach_only_muon_groups(kda_config_factory):
 	assert build_train_config(args).muon_compile is False
 	with pytest.raises(TypeError, match="muon_compile"):
 		TrainConfig(muon_compile=1)
+
+
+def test_muon_batch_cli_limits_reach_only_muon_groups(kda_config_factory):
+	args = parse_args(["--data-dir", "unused", "--smoke-test", "--muon-batched",
+		"--muon-batch-size", "8", "--muon-batch-max-mb", "16"])
+	config = build_train_config(args)
+	assert (config.muon_batched, config.muon_batch_size, config.muon_batch_max_mb) == (True, 8, 16)
+	optimizer = build_optimizer(KimiK3(kda_config_factory()), config)
+	for group in optimizer.param_groups:
+		if group["algorithm"] == "muon":
+			assert (group["ns_batched"], group["ns_batch_size"], group["ns_batch_max_bytes"]) == (True, 8, 16 * 1024**2)
+		else:
+			assert "ns_batched" not in group
+	assert build_train_config(parse_args(["--data-dir", "unused", "--smoke-test", "--no-muon-batched"])).muon_batched is False
+	with pytest.raises(TypeError, match="muon_batched"):
+		TrainConfig(muon_batched=1)
 
 
 def test_fp16_cpu_is_rejected_before_running_training():

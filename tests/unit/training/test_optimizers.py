@@ -337,12 +337,13 @@ def test_duplicate_parameters_are_rejected(across_groups):
 		MuonAdamW(groups)
 
 
-def test_sparse_gradient_is_rejected_before_any_parameter_changes():
+@pytest.mark.parametrize("batched", [False, True])
+def test_sparse_gradient_is_rejected_before_any_parameter_changes(batched):
 	muon, adam = _parameter((2, 3)), _parameter((2, 3))
 	optimizer = MuonAdamW([
 		{"params": [muon], "algorithm": "muon"},
 		{"params": [adam], "algorithm": "adamw"},
-	])
+	], ns_batched=batched)
 	muon.grad = torch.ones_like(muon)
 	adam.grad = torch.sparse_coo_tensor(torch.tensor([[0], [1]]), torch.ones(1, dtype=adam.dtype), (2, 3), check_invariants=True)
 	expected = muon.detach().clone()

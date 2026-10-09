@@ -19,6 +19,9 @@ muon_momentum: 0.95
 muon_ns_steps: 5
 muon_ns_dtype: bf16
 muon_compile: false
+muon_batched: false
+muon_batch_size: 32
+muon_batch_max_mb: 64
 qk_clip_threshold: 100.0
 qk_clip_chunk_size: 256
 lr_schedule: cosine
