@@ -1,0 +1,71 @@
+# configs/model/kimi_k3_proxy_82m.yaml
+#
+# Milestone 4 proxy: 82,221,540 total / 33,653,220 active parameters.
+# Same depth, layer schedule, head dimensions and routing as kimi_k3_300m.
+# Width/head-count scaling; not muP. LR transfer must be measured.
+# Fused KDA remains the study backend; CPU checks use a temporary chunkwise copy.
+
+# Backbone
+vocab_size: 49152
+hidden_size: 320
+num_layers: 13
+rms_norm_eps: 1.0e-5
+initializer_range: 0.02
+
+# Context
+max_seq_len: 2048
+
+# Layer schedule
+num_dense_layers: 1
+attn_res_block_size: 2
+
+layer_types:
+  - kda
+  - kda
+  - kda
+  - mla
+  - kda
+  - kda
+  - kda
+  - mla
+  - kda
+  - kda
+  - kda
+  - mla
+  - mla
+
+# Kimi Delta Attention
+kda_num_heads: 4
+kda_head_dim: 128
+kda_short_conv_kernel_size: 4
+kda_gate_lower_bound: -5.0
+kda_full_rank_output_gate: true
+kda_chunk_size: 64
+kda_implementation: fused
+
+# Gated MLA
+mla_num_heads: 4
+mla_q_lora_rank: 64
+mla_kv_lora_rank: 32
+mla_qk_nope_head_dim: 128
+mla_qk_shared_head_dim: 64
+mla_v_head_dim: 128
+mla_output_gate: true
+
+# Dense FFN
+dense_intermediate_size: 1536
+
+# Stable LatentMoE
+num_experts: 64
+num_experts_per_token: 2
+num_shared_experts: 2
+latent_moe_dim: 160
+expert_intermediate_size: 136
+latent_moe_use_norm: true
+routed_scaling_factor: 1.0
+moe_renormalize: true
+
+# SiTU-GLU
+situ_beta: 4.0
+situ_linear_beta: 25.0
+
