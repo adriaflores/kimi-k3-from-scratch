@@ -13,8 +13,9 @@ sources. The surrounding optimizer integration is specific to this repository.
   This scale differs from the original Muon learning-rate convention.
 
 The implementation retains the source kernel's quintic coefficients and five-step
-BF16 default. The upstream `torch.compile` decorator is not copied: this delivery
-establishes the eager numerical reference before model integration and profiling.
+BF16 default. An eager numerical reference remains available. The optional CUDA
+route compiles the same Newton–Schulz core with TorchInductor, caching static
+specializations by layout and arithmetic settings.
 AdamW is provided by the installed PyTorch package, rather than copied from either
 source.
 

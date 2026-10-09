@@ -158,6 +158,19 @@ def test_non_bool_adam_fused_is_rejected():
 		TrainConfig(adam_fused="no")
 
 
+def test_muon_compile_cli_and_config_reach_only_muon_groups(kda_config_factory):
+	args = parse_args(["--data-dir", "unused", "--smoke-test", "--muon-compile"])
+	config = build_train_config(args)
+	assert config.muon_compile is True
+	optimizer = build_optimizer(KimiK3(kda_config_factory()), config)
+	assert all(group["ns_compile"] is True for group in optimizer.param_groups if group["algorithm"] == "muon")
+	assert all("ns_compile" not in group for group in optimizer.param_groups if group["algorithm"] == "adamw")
+	args = parse_args(["--data-dir", "unused", "--smoke-test", "--no-muon-compile"])
+	assert build_train_config(args).muon_compile is False
+	with pytest.raises(TypeError, match="muon_compile"):
+		TrainConfig(muon_compile=1)
+
+
 def test_fp16_cpu_is_rejected_before_running_training():
 	with pytest.raises(ValueError, match="requires CUDA"):
 		validate_precision(torch.device("cpu"), "fp16")

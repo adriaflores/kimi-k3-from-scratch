@@ -289,7 +289,7 @@ def test_loader_resume_accepts_relocated_manifest_with_different_json_formatting
 
 @pytest.mark.parametrize("case", ["batch_size", "seq_len", "overfit_batch", "manifest", "cursor", "legacy",
 	"gradient_accumulation_steps", "precision", "lr_schedule", "warmup_steps", "max_grad_norm",
-	"decay_steps", "min_lr_ratio", "adam_fused", "muon_ns_dtype", "qk_clip_threshold", "qk_clip_chunk_size"])
+	"decay_steps", "min_lr_ratio", "adam_fused", "muon_ns_dtype", "muon_compile", "qk_clip_threshold", "qk_clip_chunk_size"])
 def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tmp_path, case):
 	_seed(123)
 	model = StochasticLM()
@@ -305,7 +305,7 @@ def test_incompatible_resume_is_rejected_before_changing_state(prepared_data, tm
 	incompatible = {"batch_size": 1, "seq_len": 4, "overfit_batch": True,
 					"gradient_accumulation_steps": 2, "precision": "bf16", "lr_schedule": "cosine",
 					"warmup_steps": 1, "max_grad_norm": 0.1, "decay_steps": 1001, "min_lr_ratio": 0.2,
-					"adam_fused": False, "muon_ns_dtype": "fp32", "qk_clip_threshold": 80.0,
+					"adam_fused": False, "muon_ns_dtype": "fp32", "muon_compile": True, "qk_clip_threshold": 80.0,
 					"qk_clip_chunk_size": 64}
 	if case in incompatible:
 		config = replace(config, **{case: incompatible[case]})
@@ -365,7 +365,7 @@ def test_legacy_adamw_checkpoint_is_rejected_before_mutation(prepared_data, tmp_
 
 
 @pytest.mark.parametrize("case", ["layout_name", "missing_layout", "group_names", "group_indices",
-	"matrix_view", "momentum", "missing_recipe_field", "layout_splits", "group_splits", "missing_splits"])
+	"matrix_view", "momentum", "compile_mode", "missing_recipe_field", "layout_splits", "group_splits", "missing_splits"])
 def test_hybrid_checkpoint_rejects_changed_assignment_before_mutation(
 	prepared_data, tmp_path, kda_config_factory, case,
 ):
@@ -389,6 +389,8 @@ def test_hybrid_checkpoint_rejects_changed_assignment_before_mutation(
 		group["muon_shape"] = (1, 24, 16)
 	elif case == "momentum":
 		group["momentum"] = 0.8
+	elif case == "compile_mode":
+		group["ns_compile"] = True
 	elif case in ("layout_splits", "group_splits", "missing_splits"):
 		if case == "layout_splits":
 			group = next(item for item in saved["optimizer_layout"] if "muon_split_sizes" in item)
@@ -418,6 +420,39 @@ def test_hybrid_checkpoint_rejects_changed_assignment_before_mutation(
 	assert random.getstate() == rng_before[0]
 	np.testing.assert_equal(np.random.get_state(), rng_before[1])
 	_assert_equal(torch.get_rng_state(), rng_before[2])
+
+
+def test_existing_format7_eager_checkpoint_resumes_exactly_without_new_compile_fields(
+	prepared_data, tmp_path, kda_config_factory,
+):
+	architecture = kda_config_factory(num_layers=2, layer_types=("kda", "mla"), num_dense_layers=1)
+	config = replace(_train_config(), max_steps=2, weight_decay=0.1)
+
+	def construct(seed, recipe):
+		_seed(seed)
+		model = KimiK3(architecture)
+		return model, build_optimizer(model, recipe), _loaders(prepared_data, recipe)
+
+	reference, reference_optimizer, reference_loaders = construct(123, config)
+	reference_state = train(reference, reference_optimizer, *reference_loaders, config, "cpu")
+	partial_config = replace(config, max_steps=1)
+	partial, partial_optimizer, partial_loaders = construct(123, partial_config)
+	path = tmp_path / "existing_format7.pt"
+	train(partial, partial_optimizer, *partial_loaders, partial_config, "cpu", checkpoint_path=path)
+	saved = torch.load(path, weights_only=True)
+	saved["train_config"].pop("muon_compile")
+	for group in saved["optimizer"]["param_groups"]:
+		if group["algorithm"] == "muon":
+			group.pop("ns_compile")
+	torch.save(saved, path)
+	resumed, resumed_optimizer, resumed_loaders = construct(999, config)
+	state = load_checkpoint(path, resumed, resumed_optimizer, config, vocab_size=32,
+		train_loader=resumed_loaders[0], val_loader=resumed_loaders[1])
+	state = train(resumed, resumed_optimizer, *resumed_loaders, config, "cpu", state=state)
+	_assert_equal(resumed.state_dict(), reference.state_dict())
+	_assert_equal(resumed_optimizer.state_dict(), reference_optimizer.state_dict())
+	_assert_equal(asdict(state), asdict(reference_state))
+	assert [loader.position for loader in resumed_loaders] == [loader.position for loader in reference_loaders]
 
 
 def test_full_attention_grouping_cannot_resume_per_head_recipe(

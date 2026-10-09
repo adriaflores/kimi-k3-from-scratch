@@ -136,8 +136,8 @@ training starts. Fresh runs default to unique folders under
 to choose a new folder; existing run folders are only accepted for resume.
 An explicit `--checkpoint` still selects an alternative output path.
 
-The manifest records model/training configurations, seed, actual AdamW group
-settings, parameter count, Git commit and dirty status, Python/NumPy/PyTorch
+The manifest records model/training configurations, seed, actual Muon/AdamW group
+settings and Newton–Schulz compilation mode, parameter count, Git commit and dirty status, Python/NumPy/PyTorch
 and CUDA/cuDNN versions, hardware and execution settings, and data manifest
 hashes plus dataset/tokenizer revisions when present in the data metadata.
 Git fields are `null` when unavailable; a dirty flag does not preserve the
@@ -154,7 +154,7 @@ When using a checkpoint outside the run folder, pass the original `--run-dir`
 to retain its identity. Existing manifests reject unrelated checkpoint paths
 or different model/data identities. Checkpoints inside the run folder also
 record a relative path, so moving the whole folder retains the run identity.
-This is CLI bookkeeping: checkpoint format 4 remains unchanged. The direct
+This is CLI bookkeeping: checkpoint format 7 remains unchanged. The direct
 Python `train` API accepts an optional open metrics writer.
 
 ### Persistent learning metrics
@@ -179,6 +179,7 @@ the training aggregation window. `session_end` marks normal completion.
 | `grad_norm_mean`, `grad_norm_max` | Global L2 norm after accumulation/unscaling and before clipping, over successful updates |
 | `clipped_fraction` | Fraction of successful updates whose norm exceeds the enabled clipping threshold; zero when disabled |
 | `nonfinite_grad_norms` | Number of attempts with a non-finite gradient norm |
+| `qk_clip` | Threshold, maximum causal scaled MLA logit, observed/clipped head-update counts and clipped fraction |
 
 `val` records contain `val_loss`. Every FP16 overflow also produces an immediate
 `overflow` record with attempted step, LR, loss scale, loss and consumed tokens.
@@ -300,7 +301,7 @@ invocation uses a separate folder, including resume; previous captures remain
 intact. Its settings and run/session IDs are recorded in `profile.json` and
 the `session_start` metric. Match those IDs to `run.json` for seed, commit,
 architecture, recipe and data provenance. Profiling is an observation setting,
-separate from TrainConfig and checkpoint format 4.
+separate from TrainConfig and checkpoint format 7.
 
 | Artifact | Use |
 | --- | --- |
@@ -348,3 +349,11 @@ an unused `profile_dir`. Import ProfileConfig from
 
 References: [PyTorch profiler API](https://docs.pytorch.org/docs/2.11/profiler.html)
 and [profiler recipe](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
+
+## Compiled Muon comparison
+
+The optimizer can compile the Newton–Schulz core with `--muon-compile`.
+Keep the eager/compiled runs unprofiled and discard compilation/warmup windows.
+See [the benchmark and 4050 commands](muon_compile.md). The integrated
+[Muon + QK-Clip recipe](muon_recipe.md) uses checkpoint format 7; the compilation
+setting is recorded in the manifest and must match when resuming.

@@ -88,7 +88,7 @@ baseline → capture → comparison workflow, resume, metric definitions,
 interpretation limits and the complete verification command. Measure final
 throughput in an unprofiled run with the same hardware and recipe.
 
-### Initial training recipe
+### Training recipe
 
 The trainer uses one fixed hybrid optimizer: **Muon for hidden matrices and
 native AdamW for auxiliary parameters**. Embeddings and the vocabulary head,
@@ -111,9 +111,18 @@ execution backend. `muon_momentum`, `muon_ns_steps` and `muon_ns_dtype` also hav
 CLI overrides; FP32/FP64 NS arithmetic is available for numerical checks.
 These are local test settings, not tuned Kimi K3 pretraining hyperparameters.
 
-This is **deliverable 3**: per-head attention assignment is active in the fixed
-recipe. Attention weight clipping remains the next deliverable. See
-[the head geometry and checkpoint contract](docs/notes/muon_per_head_attention.md).
+Per-head Muon and QK weight clipping are active in this recipe. QK-Clip observes
+MLA's scaled causal attention scores across all microbatches, then clips the
+corresponding Q/K projection rows after each successful optimizer update.
+The default threshold is `100`; KDA's normalized Q/K do not use this clipping.
+See [the integrated recipe and head geometry](docs/notes/muon_recipe.md).
+
+`muon_compile: false` retains the eager Newton–Schulz reference. Add
+`--muon-compile` to compile just that core on CUDA with TorchInductor; use
+`--no-muon-compile` for the comparison run. CPU optimizers remain eager.
+Compilation is lazy, cached per matrix layout, and preserves the five iterations,
+independent normalization and update scaling. Initial compilation can take
+minutes. See [the optimizer benchmark and 4050 comparison](docs/notes/muon_compile.md).
 
 For direct Python calls to `train`, a fresh optimizer's initial LR supplies
 the schedule's peak. The CLI constructs that optimizer from the recipe.
@@ -129,6 +138,7 @@ an accumulated update.
 | Recipe | Updates | Microbatch × sequence | Accumulation | Nominal processed tokens | LR / decay |
 | --- | ---: | --- | ---: | ---: | --- |
 | `smoke.yaml` | 20 | 1 × 128 | 1 | 2,560 | Constant, no weight decay |
+| `acceptance.yaml` | 64 | 1 × 128 | 2 | 16,384 repeated | 8-step warmup, cosine to 10%; weight decay 0.1 |
 | `overfit.yaml` | 2,000 | 1 × 128 | 1 | 256,000 repeated | Constant, no weight decay |
 | `stability.yaml` | 1,000 | 1 × 128 | 4 | 512,000 | 100-step warmup, cosine to 10% of peak; weight decay 0.1 |
 
@@ -172,7 +182,7 @@ defaults; it uses the same hybrid optimizer. The preset YAMLs enable the recipe 
 
 ### Checkpoints and resume
 
-New checkpoints use trainer format version 6 and are written atomically after a
+New checkpoints use trainer format version 7 and are written atomically after a
 completed optimizer update, with no pending gradients. They contain model
 parameters and persistent buffers (including Quantile Balancing biases), Muon
 momentum and native AdamW state and hyperparameters, named parameter layouts
@@ -189,7 +199,10 @@ number of successful updates, including the saved steps. Saved optimizer
 hyperparameters override CLI learning rate, weight decay, betas, epsilon, Muon
 momentum and NS iteration count. The parameter-group layout must match, including
 canonical names, shapes, dtypes and declared matrix views. Group separation stays
-stable when weight decay is zero. `adam_fused` and `muon_ns_dtype` must match.
+stable when weight decay is zero. `adam_fused`, `muon_ns_dtype` and
+`muon_compile` must match. Format-7 checkpoints from before compilation default
+to the eager mode and still resume with `--no-muon-compile`. Compiled functions
+are rebuilt lazily after resume and are not serialized.
 The LR schedule is derived from the restored step and saved base LR; it has
 no separate mutable scheduler object. `decay_steps` fixes its horizon and must
 match on resume, even when a first segment uses a smaller `max_steps`.
@@ -215,8 +228,7 @@ Prepared shards must remain unchanged: manifest identity includes their
 recorded checksums, but startup does not hash entire shard files. The data
 directory can move if its manifest and files are identical. Legacy AdamW trainer
 checkpoints (versions 3–5) cannot resume this Muon recipe; start a new run.
-Deliverable 2's full-attention Muon checkpoints also have incompatible matrix
-views/grouping, even though both stages use format 6; start a new run for this stage.
+Pre-clipping Muon checkpoints (version 6) cannot resume the integrated recipe.
 Earlier checkpoints also lack the required state. The loader rejects them before
 changing model weights, optimizer state, data cursors or RNG.
 
@@ -238,4 +250,4 @@ validation isolation, incompatible resumes, and fresh CLI processes. The
 CUDA cases are skipped when CUDA is unavailable, and native BF16 CUDA cases
 require a capable device. Recipe tests also check accumulated updates against
 a larger stateless batch, clipping after unscaling, warmup/decay boundaries,
-FP16 overflow skips, AMP FP32 regions and version-3 compatibility.
+FP16 overflow skips, AMP FP32 regions and rejection of legacy checkpoints.
