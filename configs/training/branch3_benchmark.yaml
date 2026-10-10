@@ -1,0 +1,33 @@
+# Diagnostic run for Branch 3: feasibility/timing, not an LR comparison.
+# The experimental cosine and token budgets will be fixed after these measurements.
+batch_size: 1
+seq_len: 256
+learning_rate: 0.0003
+weight_decay: 0.1
+max_steps: 100
+log_interval: 10
+eval_interval: 50
+eval_batches: 16
+checkpoint_interval: 100
+overfit_batch: false
+gradient_accumulation_steps: 2
+precision: bf16
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_eps: 1.0e-08
+adam_fused: true
+muon_momentum: 0.95
+muon_ns_steps: 5
+muon_ns_dtype: bf16
+muon_compile: true
+muon_batched: true
+muon_batch_size: 32
+muon_batch_max_mb: 64
+qk_clip_threshold: 100.0
+qk_clip_chunk_size: 256
+lr_schedule: constant
+warmup_steps: 10
+decay_steps: 1000
+min_lr_ratio: 0.1
+max_grad_norm: 1.0
+seed: 1337
