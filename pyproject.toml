@@ -8,6 +8,7 @@ dependencies = [
     "datasets>=4.2",
     "flash-linear-attention>=0.5.2",
     "huggingface-hub>=1.32.0",
+    "matplotlib>=3.11.2",
     "numpy>=2.5.3",
     "psutil>=7.2.2",
     "pyarrow>=25.0.1",

@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "study_id": "kimi_k3_milestone4_lr_batch_local_20261010",
+  "status": "design_frozen_ready_for_branch4",
+  "reviewed_benchmarked_commit": "dc8d5a2053c60dac78cad69b1774e4487bac4103",
+  "training_code_review_base": "1e7b96278a6f8be52f19c8fe09fd316d436c69e8",
+  "protocol": "kimi_k3_milestone4_branch1_protocolo.md v1.0 (2026-10-09)",
+  "scope": "Local early-horizon LR/batch calibration; no fitted universal scaling law; production pilot confirmation required",
+  "common": {
+    "microbatch_sequences": 1,
+    "seq_len": 256,
+    "seed": 1337,
+    "training_tokens_D": 2048000,
+    "warmup_tokens_W": 20480,
+    "eval_interval_tokens_E": 256000,
+    "log_interval_tokens_L": 20480,
+    "validation_prefix_tokens_V": 65536,
+    "checkpoint_interval_tokens": 1024000,
+    "lr_schedule": "cosine",
+    "min_lr_ratio": 0.1,
+    "candidate_start": "fresh model and loaders at position zero",
+    "overfit_batch": false,
+    "dataset_metadata_sha256": "06709535cc3067f61fc1b76847f7d4b3798dbfe3bb5b4cde3dc1755832fd98a9",
+    "evaluation_count_per_run": 8,
+    "log_window_count_per_run": 100,
+    "train_forwards_per_layer_per_run": 8000,
+    "qb_updates_per_layer_per_run": 8000
+  },
+  "effective_batches_tokens": [
+    512,
+    2048
+  ],
+  "nominal_learning_rates": [
+    0.0001,
+    0.0003,
+    0.001
+  ],
+  "execution_order_seed": 20261010,
+  "environment_measured": {
+    "python": "3.12.13 (main, Jun 23 2026, 15:23:43) [MSC v.1944 64 bit (AMD64)]",
+    "torch": "2.11.0+cu128",
+    "cuda": "12.8",
+    "packages": {
+      "torch": "2.11.0+cu128",
+      "flash-linear-attention": "0.5.2",
+      "fla-core": "0.5.2",
+      "triton": null,
+      "triton-windows": "3.6.0.post26"
+    },
+    "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "compute_capability": [
+      8,
+      9
+    ],
+    "total_memory_bytes": 6438780928,
+    "free_memory_bytes_before_runs": 5318377472
+  },
+  "budget": {
+    "units": "wall-clock seconds; includes measured diagnostic process wall time",
+    "planning_rates_tokens_per_second": {
+      "82m": {
+        "2": 800,
+        "8": 975
+      },
+      "122m": {
+        "2": 780,
+        "8": 930
+      },
+      "300m": {
+        "2": 550,
+        "8": 700
+      }
+    },
+    "eval_call_seconds_allowance": {
+      "82m": 24,
+      "122m": 24,
+      "300m": 28
+    },
+    "checkpoint_seconds_allowance": {
+      "82m": 3,
+      "122m": 5,
+      "300m": 25
+    },
+    "startup_seconds_per_run_allowance": 90,
+    "reporting_seconds_per_run_allowance": 15,
+    "exploration_6_runs_seconds": 15799.538461538461,
+    "transfer_up_to_3_runs_seconds": 8797.923076923078,
+    "300m_validation_2_runs_seconds": 8205.272727272728,
+    "primary_total_seconds": 32802.73426573427,
+    "diagnostics_already_measured_seconds": 1662.6527721998282,
+    "contingency_two_82m_A2_runs_seconds": 5726.0,
+    "general_margin_seconds": 1440,
+    "total_allocated_seconds": 41631.387037934095,
+    "note": "Later candidates are not selected yet; reserve all their runs at the slower A=2 cost. Estimates are planning allowances, not measured long-run speeds or guarantees."
+  },
+  "branch4_exploration_runs": [
+    {
+      "id": "82m_lr3e-4_b2048",
+      "model": "82m",
+      "learning_rate": 0.0003,
+      "gradient_accumulation_steps": 8,
+      "effective_batch_tokens": 2048,
+      "training_config": "configs/training/milestone4/lr_3e-4_b2048.yaml",
+      "training_config_sha256": "4ef46642dcba6222cbc151a03caf475fd1e39d0ef7792bbb6d7cfed91dae9b58",
+      "expected_updates": 1000,
+      "expected_tokens": 2048000,
+      "command_argv": [
+        "uv",
+        "run",
+        "python",
+        "scripts/train.py",
+        "--data-dir",
+        "C:/datasets/fineweb_edu_6b",
+        "--model-config",
+        "configs/model/kimi_k3_proxy_82m.yaml",
+        "--training-config",
+        "configs/training/milestone4/lr_3e-4_b2048.yaml",
+        "--device",
+        "cuda",
+        "--run-dir",
+        "results/training/runs/milestone4_82m_lr3e-4_b2048"
+      ],
+      "estimated_cost": {
+        "training_seconds": 2100.5128205128203,
+        "evaluation_seconds": 192,
+        "checkpoint_seconds": 6,
+        "startup_seconds_allowance": 90,
+        "reporting_seconds_allowance": 15,
+        "total_seconds": 2403.5128205128203
+      },
+      "execution_order": 1
+    },
+    {
+      "id": "82m_lr1e-3_b512",
+      "model": "82m",
+      "learning_rate": 0.001,
+      "gradient_accumulation_steps": 2,
+      "effective_batch_tokens": 512,
+      "training_config": "configs/training/milestone4/lr_1e-3_b512.yaml",
+      "training_config_sha256": "3252bb2d7f7882f84ccfd47465cea2e777ff21d9d98eb58c8d84b1266e680eba",
+      "expected_updates": 4000,
+      "expected_tokens": 2048000,
+      "command_argv": [
+        "uv",
+        "run",
+        "python",
+        "scripts/train.py",
+        "--data-dir",
+        "C:/datasets/fineweb_edu_6b",
+        "--model-config",
+        "configs/model/kimi_k3_proxy_82m.yaml",
+        "--training-config",
+        "configs/training/milestone4/lr_1e-3_b512.yaml",
+        "--device",
+        "cuda",
+        "--run-dir",
+        "results/training/runs/milestone4_82m_lr1e-3_b512"
+      ],
+      "estimated_cost": {
+        "training_seconds": 2560.0,
+        "evaluation_seconds": 192,
+        "checkpoint_seconds": 6,
+        "startup_seconds_allowance": 90,
+        "reporting_seconds_allowance": 15,
+        "total_seconds": 2863.0
+      },
+      "execution_order": 2
+    },
+    {
+      "id": "82m_lr1e-3_b2048",
+      "model": "82m",
+      "learning_rate": 0.001,
+      "gradient_accumulation_steps": 8,
+      "effective_batch_tokens": 2048,
+      "training_config": "configs/training/milestone4/lr_1e-3_b2048.yaml",
+      "training_config_sha256": "feed3ced504d3767e424e0bffb0b807680c2cbcf893db876f7dd5000885c7d3c",
+      "expected_updates": 1000,
+      "expected_tokens": 2048000,
+      "command_argv": [
+        "uv",
+        "run",
+        "python",
+        "scripts/train.py",
+        "--data-dir",
+        "C:/datasets/fineweb_edu_6b",
+        "--model-config",
+        "configs/model/kimi_k3_proxy_82m.yaml",
+        "--training-config",
+        "configs/training/milestone4/lr_1e-3_b2048.yaml",
+        "--device",
+        "cuda",
+        "--run-dir",
+        "results/training/runs/milestone4_82m_lr1e-3_b2048"
+      ],
+      "estimated_cost": {
+        "training_seconds": 2100.5128205128203,
+        "evaluation_seconds": 192,
+        "checkpoint_seconds": 6,
+        "startup_seconds_allowance": 90,
+        "reporting_seconds_allowance": 15,
+        "total_seconds": 2403.5128205128203
+      },
+      "execution_order": 3
+    },
+    {
+      "id": "82m_lr1e-4_b512",
+      "model": "82m",
+      "learning_rate": 0.0001,
+      "gradient_accumulation_steps": 2,
+      "effective_batch_tokens": 512,
+      "training_config": "configs/training/milestone4/lr_1e-4_b512.yaml",
+      "training_config_sha256": "3792c0640c784b9ef0304d94d4039061b25bfe1d106adae65f15ebc7cd7fafea",
+      "expected_updates": 4000,
+      "expected_tokens": 2048000,
+      "command_argv": [
+        "uv",
+        "run",
+        "python",
+        "scripts/train.py",
+        "--data-dir",
+        "C:/datasets/fineweb_edu_6b",
+        "--model-config",
+        "configs/model/kimi_k3_proxy_82m.yaml",
+        "--training-config",
+        "configs/training/milestone4/lr_1e-4_b512.yaml",
+        "--device",
+        "cuda",
+        "--run-dir",
+        "results/training/runs/milestone4_82m_lr1e-4_b512"
+      ],
+      "estimated_cost": {
+        "training_seconds": 2560.0,
+        "evaluation_seconds": 192,
+        "checkpoint_seconds": 6,
+        "startup_seconds_allowance": 90,
+        "reporting_seconds_allowance": 15,
+        "total_seconds": 2863.0
+      },
+      "execution_order": 4
+    },
+    {
+      "id": "82m_lr1e-4_b2048",
+      "model": "82m",
+      "learning_rate": 0.0001,
+      "gradient_accumulation_steps": 8,
+      "effective_batch_tokens": 2048,
+      "training_config": "configs/training/milestone4/lr_1e-4_b2048.yaml",
+      "training_config_sha256": "f50776771b4cad5712aeef8b706e72cf801f549a6f5c122dc5a73ba918d43d79",
+      "expected_updates": 1000,
+      "expected_tokens": 2048000,
+      "command_argv": [
+        "uv",
+        "run",
+        "python",
+        "scripts/train.py",
+        "--data-dir",
+        "C:/datasets/fineweb_edu_6b",
+        "--model-config",
+        "configs/model/kimi_k3_proxy_82m.yaml",
+        "--training-config",
+        "configs/training/milestone4/lr_1e-4_b2048.yaml",
+        "--device",
+        "cuda",
+        "--run-dir",
+        "results/training/runs/milestone4_82m_lr1e-4_b2048"
+      ],
+      "estimated_cost": {
+        "training_seconds": 2100.5128205128203,
+        "evaluation_seconds": 192,
+        "checkpoint_seconds": 6,
+        "startup_seconds_allowance": 90,
+        "reporting_seconds_allowance": 15,
+        "total_seconds": 2403.5128205128203
+      },
+      "execution_order": 5
+    },
+    {
+      "id": "82m_lr3e-4_b512",
+      "model": "82m",
+      "learning_rate": 0.0003,
+      "gradient_accumulation_steps": 2,
+      "effective_batch_tokens": 512,
+      "training_config": "configs/training/milestone4/lr_3e-4_b512.yaml",
+      "training_config_sha256": "b3a46df8783ce12332f9c38f916d98ea47f5d247819ef97b4976c0329ee730c5",
+      "expected_updates": 4000,
+      "expected_tokens": 2048000,
+      "command_argv": [
+        "uv",
+        "run",
+        "python",
+        "scripts/train.py",
+        "--data-dir",
+        "C:/datasets/fineweb_edu_6b",
+        "--model-config",
+        "configs/model/kimi_k3_proxy_82m.yaml",
+        "--training-config",
+        "configs/training/milestone4/lr_3e-4_b512.yaml",
+        "--device",
+        "cuda",
+        "--run-dir",
+        "results/training/runs/milestone4_82m_lr3e-4_b512"
+      ],
+      "estimated_cost": {
+        "training_seconds": 2560.0,
+        "evaluation_seconds": 192,
+        "checkpoint_seconds": 6,
+        "startup_seconds_allowance": 90,
+        "reporting_seconds_allowance": 15,
+        "total_seconds": 2863.0
+      },
+      "execution_order": 6
+    }
+  ],
+  "branch5_transfer": {
+    "model": "122m",
+    "max_runs": 3,
+    "candidate_rule": "Keep one unchanged candidate from 82M as anchor; compare a strong rival and optionally one justified LR variant. Freeze their configs before this phase.",
+    "training_tokens_per_run": 2048000,
+    "candidates": null
+  },
+  "branch6_validation": {
+    "model": "300m",
+    "max_runs": 2,
+    "candidate_rule": "Choose two candidates after Branch 5; use the same D and controls. If an A=8 run cannot complete due to memory, preserve failure evidence and explicitly defer that validation to production; do not relabel a substituted batch as the same candidate.",
+    "training_tokens_per_run": 2048000,
+    "candidates": null
+  },
+  "selection": {
+    "primary": "final validation loss at D, using the same V-token prefix",
+    "practical_tie_nats_per_token": 0.01,
+    "statistical_significance_claim": false,
+    "best_checkpoint_retrospective_selection": false,
+    "contingency": "At most two additional 82M runs: either paired finalist second-seed checks, or a justified boundary check. Same D and controls; declare which use before running.",
+    "seed_for_paired_finalist_repetition": 2027,
+    "boundary_rule": "If the best LR is an endpoint, do not claim the optimum is bounded. An extension only uses the predefined contingency."
+  },
+  "run_evidence_required": [
+    "run.json",
+    "metrics.jsonl",
+    "effective configs",
+    "seed/commit/data identity",
+    "final checkpoint",
+    "completion/failure reason",
+    "actual wall time"
+  ]
+}
