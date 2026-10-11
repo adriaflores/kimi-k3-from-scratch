@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "study_id": "kimi-k3-milestone4-branch5-122m-transfer-v1",
+  "phase": "branch5",
+  "common": {
+    "microbatch_sequences": 1,
+    "seq_len": 256,
+    "seed": 1337,
+    "training_tokens_D": 2048000,
+    "warmup_tokens_W": 20480,
+    "eval_interval_tokens_E": 256000,
+    "log_interval_tokens_L": 20480,
+    "validation_prefix_tokens_V": 65536,
+    "checkpoint_interval_tokens": 1024000,
+    "lr_schedule": "cosine",
+    "min_lr_ratio": 0.1,
+    "candidate_start": "fresh model and loaders at position zero",
+    "overfit_batch": false,
+    "dataset_metadata_sha256": "06709535cc3067f61fc1b76847f7d4b3798dbfe3bb5b4cde3dc1755832fd98a9",
+    "evaluation_count_per_run": 8,
+    "log_window_count_per_run": 100,
+    "train_forwards_per_layer_per_run": 8000,
+    "qb_updates_per_layer_per_run": 8000
+  },
+  "nominal_learning_rates": [
+    0.001,
+    0.003
+  ],
+  "effective_batch_tokens": [
+    512,
+    2048
+  ],
+  "model": {
+    "path": "configs/model/kimi_k3_proxy_122m.yaml",
+    "canonical_sha256": "b0645cdb2b427b6308911e9d576a8520ad3e1686b0198e3e78fa6c34b1e2c0eb",
+    "total_parameters": 122146637,
+    "active_parameters_per_token": 47151437,
+    "approx_train_gflops_per_token_at_T256": 0.3152
+  },
+  "reference": {
+    "path": "docs/notes/pretraining_transfer_reference_82m.json",
+    "canonical_sha256": "2b3d189a00007d202b4911f9a5096b2695a4b3304afe5beaf480f3064f6eb787",
+    "training_source_sha256": {
+      "pyproject.toml": "59f5cebc967324aca376e36cfb9bea2b75b8a160281897fcc11128e0b4ffb82f",
+      "scripts/train.py": "50e553e9e7bcea9100e5e3c3f2377aefde6203d6313a272a9f9f794a13f5691e",
+      "src/kimi_k3/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "src/kimi_k3/attention/__init__.py": "f570b4568fde96b48177907ceda860c3d6ac934437b0407fd81df71fbc4f6454",
+      "src/kimi_k3/attention/gated_mla.py": "49197636f5c62683a0db2a5bc843c1d105d938c4f2b07089048c091fc27cfabe",
+      "src/kimi_k3/attention/kda/chunkwise.py": "3688ced14553673a8ba84e7a21a9904d8c1d1f115c262499bffb01c931cbf643",
+      "src/kimi_k3/attention/kda/fused_chunk.py": "485607a1c863d04b2fd545d15fa2a094af720302fd8e005833143f176c2efd2b",
+      "src/kimi_k3/attention/kda/recurrent.py": "eb7646cadbafd265e7c6fae6b3128bf1a25dcdecb2a122cfe648181f834b106d",
+      "src/kimi_k3/data/__init__.py": "98235c5055bc89876b339fb4e14ed9d9a22adf0960511205b9b77c1d02696c7e",
+      "src/kimi_k3/data/dataset.py": "e36d0dc96f7ee9e311848befd4f32c9b21a9f340ddc5bc461209eee6a5509669",
+      "src/kimi_k3/ffn/__init__.py": "525d94f723c27708d0a9e9115aa7eaaf7b32cd351406e81391905d0a8838f647",
+      "src/kimi_k3/ffn/dense_ffn.py": "cced67be4966cd7ae1c0ce42c6260e2ac1515d87bb6c1b923add4aa29b4ecf52",
+      "src/kimi_k3/model.py": "17fc065f09e0a35b2d47c31841887da3aa05ee78fe286e667bf67408b9a4367d",
+      "src/kimi_k3/moe/__init__.py": "686019b72ad797901039d149a1ce2e63cedc4d684701bc61f1d4ecec2c6b88b6",
+      "src/kimi_k3/moe/stable_latent_moe.py": "2332590f4b9660e41d660a7bbad2fbb3fa3fc9e596b96aa4fdc38a114ed8c36f",
+      "src/kimi_k3/training/__init__.py": "f187f8ee3edc9fbbe8b8fbf37792f1df5d7a1fed6858a2c30e2d175abf5be618",
+      "src/kimi_k3/training/metrics.py": "2607378c7e4f0bfa5f0664d0e7e56ec5bbc443d313b4cb8a1f38ce711eb1fb5a",
+      "src/kimi_k3/training/moe_metrics.py": "7983061cb76238163c2660aff65626e7b9c4ebdda3232c39973a670db52b6e1f",
+      "src/kimi_k3/training/monitoring.py": "1006136039f168f4eae42c4722008a809a1b4a4b053684944b09538d64944779",
+      "src/kimi_k3/training/optimizers.py": "bc0d63834cc5a3b69dee15b2bba0c76e92e128241f66ffb383abb79996adacf9",
+      "src/kimi_k3/training/parameter_groups.py": "8d3d0f6e83a027ed8ba8d5b7801674e72945b501ba14165fd31205d36c27f321",
+      "src/kimi_k3/training/profiling.py": "f4782ba14d62954f098b6a4432967333a017882ed840c7ebd0f9634d00ebe366",
+      "src/kimi_k3/training/qk_clip.py": "9e30e1d94c78716284f97c7dec27de8d8489be829f770227c16dec43c9a7d18d",
+      "src/kimi_k3/training/run.py": "2588da4db4a7dacb60c873ee336f0a77d43abae747cc49ae5638b0e1f60ac068",
+      "src/kimi_k3/training/trainer.py": "30444e5e00d917996af6a44bb98228ed2a3d4289a490945e5e99ab0959362fda",
+      "src/kimi_k3/utils/__init__.py": "1568590a049ee3265774cd540052d7676ce938a41c3af1f947de5e7219e26aa6",
+      "src/kimi_k3/utils/config.py": "0ec9b411efebddc2795c9962c8a8e8f9f56b944ebd5670ad191bd372c912e30c",
+      "src/kimi_k3/utils/rmsn.py": "987ea19bf8d9f8031774895b97ebd683213e4b535961042575b3df02fe8ff38a",
+      "uv.lock": "fe0d3289d1652aceac3876bb28a9b3f157c1fbb302bd923d5bbfcc4fdb303d37"
+    },
+    "environment": {
+      "python": "3.12.13",
+      "torch": "2.11.0+cu128",
+      "cuda": "12.8",
+      "packages": {
+        "torch": "2.11.0+cu128",
+        "numpy": "2.5.3",
+        "flash-linear-attention": "0.5.2",
+        "fla-core": "0.5.2",
+        "triton": null,
+        "triton-windows": "3.6.0.post26"
+      },
+      "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+      "compute_capability": [
+        8,
+        9
+      ],
+      "total_memory_bytes": 6438780928
+    },
+    "input_archives": [
+      {
+        "filename": "branch4_results(1).zip",
+        "sha256": "0af2816fd1bc1addfea931791f35ed58fc3f82b8bdfd9426be6f5d7138e22a5f"
+      },
+      {
+        "filename": "branch4_results(2).zip",
+        "sha256": "04cacc7ddcfd2be34572a01189cbc44fea38696f4be559c2ed3cf495bffc6d22"
+      }
+    ]
+  },
+  "branch5_transfer_runs": [
+    {
+      "id": "122m_lr3e-3_b2048",
+      "model": "122m",
+      "learning_rate": 0.003,
+      "effective_batch_tokens": 2048,
+      "gradient_accumulation_steps": 8,
+      "training_config": "configs/training/milestone4_branch5/lr_3e-3_b2048.yaml",
+      "expected_updates": 1000,
+      "expected_tokens": 2048000,
+      "execution_order": 1,
+      "role": "unchanged_82m_anchor",
+      "reference_82m_id": "82m_lr3e-3_b2048",
+      "estimated_cost": {
+        "total_seconds": 2508,
+        "source": "Branch 3 conservative estimate, not a time limit"
+      }
+    },
+    {
+      "id": "122m_lr1e-3_b2048",
+      "model": "122m",
+      "learning_rate": 0.001,
+      "effective_batch_tokens": 2048,
+      "gradient_accumulation_steps": 8,
+      "training_config": "configs/training/milestone4_branch5/lr_1e-3_b2048.yaml",
+      "expected_updates": 1000,
+      "expected_tokens": 2048000,
+      "execution_order": 2,
+      "role": "lower_lr_same_batch",
+      "reference_82m_id": "82m_lr1e-3_b2048",
+      "estimated_cost": {
+        "total_seconds": 2508,
+        "source": "Branch 3 conservative estimate, not a time limit"
+      }
+    },
+    {
+      "id": "122m_lr3e-3_b512",
+      "model": "122m",
+      "learning_rate": 0.003,
+      "effective_batch_tokens": 512,
+      "gradient_accumulation_steps": 2,
+      "training_config": "configs/training/milestone4_branch5/lr_3e-3_b512.yaml",
+      "expected_updates": 4000,
+      "expected_tokens": 2048000,
+      "execution_order": 3,
+      "role": "same_lr_batch_control",
+      "reference_82m_id": "82m_lr3e-3_b512",
+      "estimated_cost": {
+        "total_seconds": 2934,
+        "source": "Branch 3 conservative estimate, not a time limit"
+      }
+    }
+  ],
+  "contrasts": [
+    {
+      "name": "lr_at_b2048",
+      "question": "Does the larger LR still help at B=2048?",
+      "treatment": "122m_lr3e-3_b2048",
+      "control": "122m_lr1e-3_b2048"
+    },
+    {
+      "name": "batch_at_lr3e-3",
+      "question": "Does the larger batch still help at LR=3e-3?",
+      "treatment": "122m_lr3e-3_b2048",
+      "control": "122m_lr3e-3_b512"
+    }
+  ],
+  "selection": {
+    "practical_tie_nats_per_token": 0.01,
+    "metric": "final validation loss at common D",
+    "one_seed": true,
+    "no_power_law_fit": true,
+    "no_6b_optimum_claim": true,
+    "no_automatic_additional_runs": true
+  },
+  "execution": {
+    "order_rule": "Anchor, lower-LR rival, then batch contrast. Fixed before training.",
+    "maximum_candidates": 3,
+    "estimated_total_minutes": 132.5,
+    "checkpoints_unchanged_from_82m": true,
+    "power_profile": "Record a user-declared label; it is not measured by the runner."
+  },
+  "literature": {}
+}
