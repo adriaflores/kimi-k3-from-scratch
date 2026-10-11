@@ -1,0 +1,288 @@
+{
+  "common": {
+    "microbatch_sequences": 1,
+    "seq_len": 256,
+    "seed": 1337,
+    "training_tokens_D": 2048000,
+    "warmup_tokens_W": 20480,
+    "eval_interval_tokens_E": 256000,
+    "log_interval_tokens_L": 20480,
+    "validation_prefix_tokens_V": 65536,
+    "checkpoint_interval_tokens": 1024000,
+    "lr_schedule": "cosine",
+    "min_lr_ratio": 0.1,
+    "candidate_start": "fresh model and loaders at position zero",
+    "overfit_batch": false,
+    "dataset_metadata_sha256": "06709535cc3067f61fc1b76847f7d4b3798dbfe3bb5b4cde3dc1755832fd98a9",
+    "evaluation_count_per_run": 8,
+    "log_window_count_per_run": 100,
+    "train_forwards_per_layer_per_run": 8000,
+    "qb_updates_per_layer_per_run": 8000
+  },
+  "scales": {
+    "82m": [
+      {
+        "id": "82m_lr1e-3_b2048",
+        "learning_rate": 0.001,
+        "effective_batch_tokens": 2048,
+        "final_val_loss": 6.0439399015158415,
+        "validation": [
+          {
+            "id": "82m_lr1e-3_b2048",
+            "step": 125,
+            "tokens_seen": 256000,
+            "val_loss": 7.170667976140976,
+            "eval_seconds": 22.884217099985108
+          },
+          {
+            "id": "82m_lr1e-3_b2048",
+            "step": 250,
+            "tokens_seen": 512000,
+            "val_loss": 6.658178746700287,
+            "eval_seconds": 22.628649900085293
+          },
+          {
+            "id": "82m_lr1e-3_b2048",
+            "step": 375,
+            "tokens_seen": 768000,
+            "val_loss": 6.434763073921204,
+            "eval_seconds": 21.86534329992719
+          },
+          {
+            "id": "82m_lr1e-3_b2048",
+            "step": 500,
+            "tokens_seen": 1024000,
+            "val_loss": 6.315241985023022,
+            "eval_seconds": 22.765797800035216
+          },
+          {
+            "id": "82m_lr1e-3_b2048",
+            "step": 625,
+            "tokens_seen": 1280000,
+            "val_loss": 6.2111331932246685,
+            "eval_seconds": 22.56705770001281
+          },
+          {
+            "id": "82m_lr1e-3_b2048",
+            "step": 750,
+            "tokens_seen": 1536000,
+            "val_loss": 6.1192564480006695,
+            "eval_seconds": 23.044490600004792
+          },
+          {
+            "id": "82m_lr1e-3_b2048",
+            "step": 875,
+            "tokens_seen": 1792000,
+            "val_loss": 6.078473810106516,
+            "eval_seconds": 22.529134900076315
+          },
+          {
+            "id": "82m_lr1e-3_b2048",
+            "step": 1000,
+            "tokens_seen": 2048000,
+            "val_loss": 6.0439399015158415,
+            "eval_seconds": 22.738210399984382
+          }
+        ]
+      },
+      {
+        "id": "82m_lr3e-3_b2048",
+        "learning_rate": 0.003,
+        "effective_batch_tokens": 2048,
+        "final_val_loss": 5.919598896056414,
+        "validation": [
+          {
+            "id": "82m_lr3e-3_b2048",
+            "step": 125,
+            "tokens_seen": 256000,
+            "val_loss": 6.962125401943922,
+            "eval_seconds": 21.6541864000028
+          },
+          {
+            "id": "82m_lr3e-3_b2048",
+            "step": 250,
+            "tokens_seen": 512000,
+            "val_loss": 6.5863745249807835,
+            "eval_seconds": 22.520203400054015
+          },
+          {
+            "id": "82m_lr3e-3_b2048",
+            "step": 375,
+            "tokens_seen": 768000,
+            "val_loss": 6.363945120945573,
+            "eval_seconds": 21.092458299943246
+          },
+          {
+            "id": "82m_lr3e-3_b2048",
+            "step": 500,
+            "tokens_seen": 1024000,
+            "val_loss": 6.267174573615193,
+            "eval_seconds": 21.410602499963716
+          },
+          {
+            "id": "82m_lr3e-3_b2048",
+            "step": 625,
+            "tokens_seen": 1280000,
+            "val_loss": 6.136932807043195,
+            "eval_seconds": 21.44999670004472
+          },
+          {
+            "id": "82m_lr3e-3_b2048",
+            "step": 750,
+            "tokens_seen": 1536000,
+            "val_loss": 6.022111026570201,
+            "eval_seconds": 21.33530909998808
+          },
+          {
+            "id": "82m_lr3e-3_b2048",
+            "step": 875,
+            "tokens_seen": 1792000,
+            "val_loss": 5.971182599663734,
+            "eval_seconds": 21.21563739993144
+          },
+          {
+            "id": "82m_lr3e-3_b2048",
+            "step": 1000,
+            "tokens_seen": 2048000,
+            "val_loss": 5.919598896056414,
+            "eval_seconds": 21.224166900035925
+          }
+        ]
+      }
+    ],
+    "122m": [
+      {
+        "id": "122m_lr3e-3_b2048",
+        "learning_rate": 0.003,
+        "effective_batch_tokens": 2048,
+        "final_val_loss": 5.943831242620945,
+        "validation": [
+          {
+            "id": "122m_lr3e-3_b2048",
+            "step": 125,
+            "tokens_seen": 256000,
+            "val_loss": 6.991742718964815,
+            "eval_seconds": 21.661520199966617
+          },
+          {
+            "id": "122m_lr3e-3_b2048",
+            "step": 250,
+            "tokens_seen": 512000,
+            "val_loss": 6.609620053321123,
+            "eval_seconds": 21.649260199978016
+          },
+          {
+            "id": "122m_lr3e-3_b2048",
+            "step": 375,
+            "tokens_seen": 768000,
+            "val_loss": 6.390910116955638,
+            "eval_seconds": 19.66182999999728
+          },
+          {
+            "id": "122m_lr3e-3_b2048",
+            "step": 500,
+            "tokens_seen": 1024000,
+            "val_loss": 6.283631820231676,
+            "eval_seconds": 21.448996599996462
+          },
+          {
+            "id": "122m_lr3e-3_b2048",
+            "step": 625,
+            "tokens_seen": 1280000,
+            "val_loss": 6.163508730009198,
+            "eval_seconds": 21.169998200028203
+          },
+          {
+            "id": "122m_lr3e-3_b2048",
+            "step": 750,
+            "tokens_seen": 1536000,
+            "val_loss": 6.047940034419298,
+            "eval_seconds": 20.717814899981022
+          },
+          {
+            "id": "122m_lr3e-3_b2048",
+            "step": 875,
+            "tokens_seen": 1792000,
+            "val_loss": 5.996257634833455,
+            "eval_seconds": 20.811946399975568
+          },
+          {
+            "id": "122m_lr3e-3_b2048",
+            "step": 1000,
+            "tokens_seen": 2048000,
+            "val_loss": 5.943831242620945,
+            "eval_seconds": 21.56494909990579
+          }
+        ]
+      },
+      {
+        "id": "122m_lr1e-3_b2048",
+        "learning_rate": 0.001,
+        "effective_batch_tokens": 2048,
+        "final_val_loss": 6.054247235879302,
+        "validation": [
+          {
+            "id": "122m_lr1e-3_b2048",
+            "step": 125,
+            "tokens_seen": 256000,
+            "val_loss": 7.188236474990845,
+            "eval_seconds": 21.68163339991588
+          },
+          {
+            "id": "122m_lr1e-3_b2048",
+            "step": 250,
+            "tokens_seen": 512000,
+            "val_loss": 6.672529727220535,
+            "eval_seconds": 21.83971950004343
+          },
+          {
+            "id": "122m_lr1e-3_b2048",
+            "step": 375,
+            "tokens_seen": 768000,
+            "val_loss": 6.447066098451614,
+            "eval_seconds": 20.206455299980007
+          },
+          {
+            "id": "122m_lr1e-3_b2048",
+            "step": 500,
+            "tokens_seen": 1024000,
+            "val_loss": 6.32656566798687,
+            "eval_seconds": 21.950490799965337
+          },
+          {
+            "id": "122m_lr1e-3_b2048",
+            "step": 625,
+            "tokens_seen": 1280000,
+            "val_loss": 6.219439171254635,
+            "eval_seconds": 21.49023900006432
+          },
+          {
+            "id": "122m_lr1e-3_b2048",
+            "step": 750,
+            "tokens_seen": 1536000,
+            "val_loss": 6.131031287834048,
+            "eval_seconds": 21.233716699993238
+          },
+          {
+            "id": "122m_lr1e-3_b2048",
+            "step": 875,
+            "tokens_seen": 1792000,
+            "val_loss": 6.0882893446832895,
+            "eval_seconds": 21.408000000054017
+          },
+          {
+            "id": "122m_lr1e-3_b2048",
+            "step": 1000,
+            "tokens_seen": 2048000,
+            "val_loss": 6.054247235879302,
+            "eval_seconds": 21.345374100026675
+          }
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "branch5_results_sha256": "f3c66d79a7ccfac8cc80b76a31cec04f183fe06090d875622343c37f15d3aa15",
+    "note": "Measured proxy results, one seed; same token horizon, not IsoFLOPs."
+  }
+}
