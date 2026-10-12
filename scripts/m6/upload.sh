@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run in Git Bash at any path within the local Git repository.
 set -euo pipefail
-M6_HOST="${M6_HOST:-vast-kimi}"
+M6_HOST="${M6_HOST:-vast}"
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 for path in scripts/m6/upload.sh scripts/m6/run.sh scripts/m6/launch.sh scripts/m6/status.sh scripts/m6/download.sh scripts/m6/package_results.py experiments/m6/current/run.py experiments/m6/current/experiment.json; do
