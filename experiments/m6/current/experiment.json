@@ -1,0 +1,7 @@
+{
+  "experiment_id": "m6_microbatch_sweep_v1",
+  "objective": "Benchmark microbatch 2/4/8 at sequence length 1024 on H100 NVL; source and optimizer unchanged",
+  "type": "systems-only",
+  "source_policy": "verified_immutable_m5_reference",
+  "note": "Batch >2 changes effective batch; not approved for production training"
+}
