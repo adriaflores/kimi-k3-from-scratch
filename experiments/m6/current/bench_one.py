@@ -36,8 +36,8 @@ def main():
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=False)
     config_path = args.control / 'configs/training/milestone5_branch5/t1024.yaml'
-    assert args.batch in (2, 4, 8, 16), 'Only explicitly reviewed batches are allowed'
-    assert args.steps > args.burn >= 100 and args.steps % 20 == 0 and args.burn % 20 == 0
+    assert args.batch in (8, 16, 24, 32, 40), 'Only sweep v2 batches are allowed'
+    assert args.steps == 320 and args.burn == 200, "Sweep v2 uses the same 320/200 windows as sweep v1"
     assert config_path.is_file() and (args.repo / 'scripts/train.py').is_file()
     assert (args.data / 'metadata.json').exists() or any(args.data.glob('*.json')), 'Missing qualification data metadata'
     sys.path.insert(0, str((args.control / 'scripts/milestone5').resolve()))
@@ -125,6 +125,7 @@ def main():
         'peak_cuda_reserved_bytes':max((m.get('cuda_peak_reserved_bytes') or 0 for m in memory),default=0),
         'peak_cuda_allocated_bytes':max((m.get('cuda_peak_allocated_bytes') or 0 for m in memory),default=0),
         'baseline_t1024_rate':12023.30,
+        'previous_sweep_batch8_rate':39064.30583842132,
         'speedup_vs_historical':(tokens / elapsed)/12023.30,
         'compute_only_6b_hours':6_000_001_024/(tokens/elapsed)/3600,
         'note':'Throughput measured without profiler; excludes evaluation, checkpoints, upload, setup, taxes and storage.',

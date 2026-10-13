@@ -1,7 +1,17 @@
 {
-  "experiment_id": "m6_microbatch_sweep_v1",
-  "objective": "Benchmark microbatch 2/4/8 at sequence length 1024 on H100 NVL; source and optimizer unchanged",
+  "experiment_id": "m6_microbatch_sweep_v2",
+  "objective": "Find H100 NVL microbatch throughput/memory trend using 8 control then 16,24,32 and conditional 40 at context 1024",
   "type": "systems-only",
   "source_policy": "verified_immutable_m5_reference",
-  "note": "Batch >2 changes effective batch; not approved for production training"
+  "model_code_changes": false,
+  "optimizer_code_changes": false,
+  "context_tokens": 1024,
+  "gradient_accumulation": 1,
+  "case_steps": 320,
+  "burn_steps": 200,
+  "expected_sequence": [8,16,24,32],
+  "conditional_case": 40,
+  "memory_guard": "predict <=90% of H100 total VRAM and leave >=7 GiB; after b32 require >=5% improvement over b24 for conditional b40",
+  "time_guard_seconds": 1080,
+  "note": "Larger effective batches are benchmarks only, not an accepted learning-rate/batch training recipe. No checkpoints/evaluation."
 }
