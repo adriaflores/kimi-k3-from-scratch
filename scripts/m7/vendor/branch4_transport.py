@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 import os
@@ -125,14 +126,44 @@ def upload_data(connection: Connection, data: Path, inspection: Path, scope: str
             raise ValueError("Full metadata changed since origin inspection")
     destination = connection.remote_root + "/data/" + ("qualification" if scope == "qualification" else "full")
     connection.rpc(["mkdir", "--path", destination])
-    rows = []
-    for entry in manifest["files"]:
+    # Independent immutable shards can be uploaded concurrently. Each shard keeps
+    # its own SHA-named partial; only a verified partial is atomically published.
+    # Keep concurrency bounded to avoid flooding Vast's SSH daemon.
+    workers_text = os.environ.get("M7_TRANSFER_WORKERS", "2")
+    if not re.fullmatch(r"[1-4]", workers_text):
+        raise ValueError("M7_TRANSFER_WORKERS must be an integer from 1 to 4")
+    workers = int(workers_text)
+    entries = manifest["files"]
+    if any(not re.fullmatch(r"(train|val)_[0-9]{5}\.npy", entry["file"]) for entry in entries):
+        raise ValueError("Invalid shard name in transfer manifest")
+    rows = [None] * len(entries)
+
+    def transfer(index, entry):
         name = entry["file"]
-        if not re.fullmatch(r"(train|val)_[0-9]{5}\.npy", name):
-            raise ValueError("Invalid shard name in transfer manifest")
-        print("Transfer: " + name, flush=True)
-        rows.append(upload_one(connection, data / name, destination + "/" + name,
-                               entry["file_bytes"], entry["sha256"], restart))
+        print(f"Starting [{index + 1}/{len(entries)}]: {name}", flush=True)
+        row = upload_one(connection, data / name, destination + "/" + name,
+                         entry["file_bytes"], entry["sha256"], restart)
+        label = "already verified" if row.get("skipped_verified") else (
+            f"{row['effective_mbps']:.1f} Mbps including checks")
+        print(f"Finished [{index + 1}/{len(entries)}]: {name} ({label})", flush=True)
+        return index, row
+
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="m7-upload") as pool:
+        futures = [pool.submit(transfer, index, entry) for index, entry in enumerate(entries)]
+        # Drain all workers before returning any error, so no upload continues
+        # behind the caller's back. Never publish metadata on partial failure.
+        first_error = None
+        for future in as_completed(futures):
+            try:
+                index, row = future.result()
+                rows[index] = row
+            except Exception as error:
+                if first_error is None:
+                    first_error = error
+                for pending in futures:
+                    pending.cancel()
+        if first_error is not None:
+            raise first_error
     # Publish metadata last; a new dataset is not advertised before its shards.
     rows.append(upload_one(connection, metadata_path, destination + "/metadata.json",
                            metadata_path.stat().st_size, sha256_file(metadata_path), restart))
