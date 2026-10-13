@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run in local Git Bash. Safe to call after the remote run has finished, including failed runs.
 set -euo pipefail
-M6_HOST="${M6_HOST:-vast-kimi}"
+M6_HOST="${M6_HOST:-vast}"
 ROOT="$(git rev-parse --show-toplevel)"
 REMOTE=/workspace/kimi/artifacts
 STATUS="$(ssh "$M6_HOST" "cat '$REMOTE/m6_latest_status.txt'")"
