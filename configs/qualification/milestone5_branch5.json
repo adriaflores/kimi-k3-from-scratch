@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "production_tokens": 6000001024,
+  "tokens_per_update": 2048,
+  "warmup_steps": 29297,
+  "decay_steps": 2929688,
+  "validation_tokens": 65536,
+  "qualification_wall_seconds": 7200,
+  "qualification_active_cost_eur": 6,
+  "finish_reserve_seconds": 300,
+  "candidate_phase_timeout_seconds": 1800,
+  "resume_phase_timeout_seconds": 900,
+  "profile_phase_timeout_seconds": 900,
+  "burn_in_updates": 200,
+  "minimum_measurement_train_seconds": 60,
+  "maximum_measurement_train_seconds": 120,
+  "settled_window_ratio_max": 1.25,
+  "max_fresh_updates": 8192,
+  "resume_updates": 8,
+  "profile_updates": 5,
+  "physical_memory_headroom_fraction": 0.2,
+  "production_log_interval": 100,
+  "production_eval_checkpoint_interval": 2500,
+  "recovery_time_fraction": 0.02,
+  "campaign_reserve_eur": 10,
+  "campaign_budget_target_eur": 50,
+  "campaign_budget_max_eur": 100,
+  "desired_campaign_hours": 50,
+  "context_1024_max_cost_penalty_fraction": 0.1,
+  "h100_provisional_price_cap_usd_hour": 2.35,
+  "candidates": [
+    {
+      "label": "t512",
+      "microbatch": 4,
+      "seq_len": 512,
+      "accumulation": 1
+    },
+    {
+      "label": "t1024",
+      "microbatch": 2,
+      "seq_len": 1024,
+      "accumulation": 1
+    }
+  ],
+  "diagnostic_baseline_only": {
+    "label": "baseline",
+    "microbatch": 1,
+    "seq_len": 256,
+    "accumulation": 8,
+    "max_steps": 32
+  },
+  "production_qualified": false,
+  "profile_schedule": {
+    "wait": 2,
+    "warmup": 1,
+    "active": 1,
+    "trailing_unprofiled_update": 1
+  },
+  "noncompute_reserve_floor_eur": 2,
+  "qualification_disk_gb": 80
+}

@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import os
 import sys
 import time
@@ -59,6 +60,13 @@ def simple_yaml(path):
         if line.count(':') != 1:
             raise ValueError(f'Unsupported YAML syntax at line {index}')
         key, raw = (x.strip() for x in line.split(':', 1))
+        # PyYAML safe_load treats 1e-08 as a string (1.0e-08 is a float).
+        # The local preflight must catch that BEFORE remote TrainConfig validation.
+        if re.fullmatch(r'[+-]?[0-9]+[eE][+-]?[0-9]+', raw):
+            raise ValueError(
+                f'{key} at line {index}: scientific YAML numbers must include a decimal point '
+                f'(for example 1.0e-08); PyYAML would load {raw!r} as a string'
+            )
         if not key.isidentifier() or not raw or key in values:
             raise ValueError(f'Invalid or duplicate YAML key at line {index}')
         values[key] = scalar(raw)
