@@ -1,0 +1,84 @@
+---
+import "../styles/site.css";
+const {
+  title = "Kimi K3 — From Scratch",
+  description = "A research engineering project: implementing and pretraining a scaled Kimi K3 language backbone in PyTorch.",
+  current = "",
+} = Astro.props;
+const links = [
+  { href: "/", label: "Overview", id: "overview" },
+  { href: "/paper-to-code/", label: "Paper → Code", id: "paper" },
+  { href: "/training/", label: "Training", id: "training" },
+  { href: "/results/", label: "Results", id: "results" },
+  { href: "/docs/", label: "Docs", id: "docs" },
+];
+const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://kimi-k3.adriaflores.com/").toString();
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f9f9f7" />
+    <script is:inline>
+      (() => {
+        let saved;
+        try { saved = localStorage.getItem("kimi-k3-theme"); } catch (_) {}
+        const systemDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+        const theme = saved === "dark" || saved === "light" ? saved : (systemDark ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", theme === "dark" ? "#101714" : "#f9f9f7");
+      })();
+    </script>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="/" aria-label="Kimi K3 project home"><span class="brand-mark">K<span>3</span></span><span class="brand-label">KIMI K3 <small>FROM SCRATCH</small></span></a>
+        <nav class="top-nav" aria-label="Main navigation">
+          {links.map(link => <a href={link.href} aria-current={current === link.id ? "page" : undefined}>{link.label}</a>)}
+        </nav>
+        <div class="header-actions">
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme" title="Toggle light and dark theme"><span class="theme-icon" aria-hidden="true">◐</span><span class="theme-label">Theme</span></button>
+          <a class="header-github" href="https://github.com/adriaflores/kimi-k3-from-scratch" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+        </div>
+      </header>
+      <main id="main"><slot /></main>
+      <footer class="site-footer">
+        <div class="footer-ident"><span class="footer-logo">K3</span><span>An independent research engineering project.<br />Not affiliated with the Kimi team.</span></div>
+        <div class="footer-links"><a href="https://github.com/adriaflores/kimi-k3-from-scratch">Source ↗</a><a href="https://adriaflores.com">Adrià Flores ↗</a><a href="/docs/">Documentation</a></div>
+        <div class="footer-end">Built with Astro · PyTorch · research notes</div>
+      </footer>
+    </div>
+    <script is:inline>
+      (() => {
+        const button = document.getElementById("theme-toggle");
+        if (!button) return;
+        const update = () => {
+          const dark = document.documentElement.dataset.theme === "dark";
+          button.querySelector(".theme-icon").textContent = dark ? "☀" : "☾";
+          button.querySelector(".theme-label").textContent = dark ? "Light" : "Dark";
+          button.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+          button.title = dark ? "Switch to light theme" : "Switch to dark theme";
+        };
+        button.addEventListener("click", () => {
+          const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+          document.documentElement.dataset.theme = next;
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", next === "dark" ? "#101714" : "#f9f9f7");
+          try { localStorage.setItem("kimi-k3-theme", next); } catch (_) {}
+          update();
+        });
+        update();
+      })();
+    </script>
+  </body>
+</html>

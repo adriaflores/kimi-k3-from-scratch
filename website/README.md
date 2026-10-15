@@ -1,43 +1,26 @@
-# Astro Starter Kit: Minimal
+# Kimi K3 — Project site
 
-```sh
-npm create astro@latest -- --template minimal
-```
+This directory contains the Astro site intended for `kimi-k3.adriaflores.com`.
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+Its purpose is to present the research engineering project and provide a polished rendering of the repository's **technical reference documentation**. It is intentionally separate from Adrià Flores' personal blog (`adriaflores.com/blog`), where independent educational deep dives will be published.
 
-## 🚀 Project Structure
+- `src/pages/index.astro`: project landing page.
+- `src/pages/engineering.astro`: implementation and verification summary.
+- `src/pages/results.astro`: evaluation status and, later, final results.
+- `src/pages/docs/`: curated documentation, generated from `../docs/*.md`.
+- `src/layouts/SiteLayout.astro` and `src/styles/site.css`: visual system.
+- `DEPLOY.md`: local preview and Cloudflare Pages deployment instructions.
 
-Inside of your Astro project, you'll see the following folders and files:
+From this directory, run `npm ci` followed by `npm run dev` or `npm run build`.
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
+The existing `docs/01_kimi_delta_attention.md` is an early, partially outdated long-form draft and is **not** included in the new technical-reference navigation until its editorial destination has been decided. The original Markdown is preserved.
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+## v2 site information architecture
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+- `/`: the independent-project overview.
+- `/paper-to-code/`: architecture mechanisms, implementation map and validation (not a second mathematical blog).
+- `/training/`: data, recipe, GPU qualification and recovery work.
+- `/results/`: measured pilot evidence and final evaluation when available.
+- `/docs/`: concise source-linked Markdown technical reference.
 
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+A persistent Light / Dark control follows the visitor's system preference until overridden. The selection is saved locally in the browser. `/engineering/` is kept as a backwards-compatible redirect to `/training/`.

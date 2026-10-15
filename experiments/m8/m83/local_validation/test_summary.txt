@@ -1,0 +1,181 @@
+test_changed_yaml_must_fail_even_if_meaning_identical (test_m81.ContractTests.test_changed_yaml_must_fail_even_if_meaning_identical) ... ok
+test_checkpoint_header_real_contract_mock_only (test_m81.ContractTests.test_checkpoint_header_real_contract_mock_only)
+Logic under test, not a claim that the real 2.5GB checkpoint was read. ... ok
+test_cost_must_be_current_and_within_cap (test_m81.ContractTests.test_cost_must_be_current_and_within_cap) ... ok
+test_duplicate_yaml_rejected (test_m81.ContractTests.test_duplicate_yaml_rejected) ... ok
+test_exact_recipe_and_horizon (test_m81.ContractTests.test_exact_recipe_and_horizon) ... ok
+test_integrated_local_receipt_and_no_training (test_m81.ContractTests.test_integrated_local_receipt_and_no_training) ... ok
+test_m75_gate_receipt (test_m81.ContractTests.test_m75_gate_receipt) ... ok
+test_m75_receipt_is_host_platform_independent (test_m81.ContractTests.test_m75_receipt_is_host_platform_independent)
+Regression: WindowsPath.__str__ uses backslashes for Linux receipt paths. ... ok
+test_manifest_matches_immutable_files_and_detects_drift (test_m81.ContractTests.test_manifest_matches_immutable_files_and_detects_drift) ... ok
+test_missing_source_manifest_fails_closed (test_m81.ContractTests.test_missing_source_manifest_fails_closed) ... ok
+test_output_path_is_new_and_does_not_overwrite_source (test_m81.ContractTests.test_output_path_is_new_and_does_not_overwrite_source) ... ok
+test_remote_missing_price_is_no_go_before_gpu_import (test_m81.ContractTests.test_remote_missing_price_is_no_go_before_gpu_import) ... ok
+test_tampered_receipt_fails (test_m81.ContractTests.test_tampered_receipt_fails) ... ok
+test_wrong_disk_policy_fails (test_m81.ContractTests.test_wrong_disk_policy_fails) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.013s
+
+OK
+{
+  "stage": "local",
+  "status": "PASS",
+  "checks": {
+    "recipe": {
+      "sha256": "2917190c3db675d18f0e439696e77222c87a8e577c5eba96aadaaf4708516ca6",
+      "tokens_per_update": 32768,
+      "source_step": 2442,
+      "first_resumed_step": 2443,
+      "target_global_step": 183106,
+      "remaining_updates": 180664,
+      "remaining_tokens": 5919997952,
+      "nominal_total_tokens": 6000017408,
+      "first_periodic_checkpoint_step": 4096,
+      "first_periodic_checkpoint_updates_from_resume": 1654,
+      "dataset_tail_dropped_tokens": 17035,
+      "last_batch_restart_tokens": 32768
+    },
+    "m75_resumption_evidence": {
+      "status": "PASS",
+      "original_step": 2442,
+      "checkpoint_sha256": "cd72de269f7036b7a96ffe6f291339e3743eac90a98322d7dea20b9691e17e12",
+      "optimizer_state_entries": 1830,
+      "rng": [
+        "python",
+        "numpy",
+        "torch_cpu",
+        "torch_cuda"
+      ]
+    }
+  },
+  "gpu_accessed": false,
+  "training_started": false,
+  "remote_preflight_status": "PENDING",
+  "checked_at_utc": "2026-10-14T12:49:04.939161+00:00"
+}
+{
+  "stage": "local",
+  "status": "PASS",
+  "checks": {
+    "recipe": {
+      "sha256": "2917190c3db675d18f0e439696e77222c87a8e577c5eba96aadaaf4708516ca6",
+      "tokens_per_update": 32768,
+      "source_step": 2442,
+      "first_resumed_step": 2443,
+      "target_global_step": 183106,
+      "remaining_updates": 180664,
+      "remaining_tokens": 5919997952,
+      "nominal_total_tokens": 6000017408,
+      "first_periodic_checkpoint_step": 4096,
+      "first_periodic_checkpoint_updates_from_resume": 1654,
+      "dataset_tail_dropped_tokens": 17035,
+      "last_batch_restart_tokens": 32768
+    },
+    "m75_resumption_evidence": {
+      "status": "PASS",
+      "original_step": 2442,
+      "checkpoint_sha256": "cd72de269f7036b7a96ffe6f291339e3743eac90a98322d7dea20b9691e17e12",
+      "optimizer_state_entries": 1830,
+      "rng": [
+        "python",
+        "numpy",
+        "torch_cpu",
+        "torch_cuda"
+      ]
+    }
+  },
+  "gpu_accessed": false,
+  "training_started": false,
+  "remote_preflight_status": "PENDING",
+  "checked_at_utc": "2026-10-14T12:49:05.750264+00:00"
+}
+
+M8.1 LOCAL PASS: remote preflight NOT performed; no training started.
+test_ack_monotonic (test_m82.M82Tests.test_ack_monotonic) ... ok
+test_atomic_snapshot_and_header_hook (test_m82.M82Tests.test_atomic_snapshot_and_header_hook) ... ok
+test_backup_client_bad_download_never_acks (test_m82.M82Tests.test_backup_client_bad_download_never_acks) ... ok
+test_backup_client_idempotent_local_protection (test_m82.M82Tests.test_backup_client_idempotent_local_protection) ... ok
+test_backup_client_rejects_untrusted_remote_request (test_m82.M82Tests.test_backup_client_rejects_untrusted_remote_request) ... ok
+test_backup_client_success_ack_after_verified_bytes (test_m82.M82Tests.test_backup_client_success_ack_after_verified_bytes) ... ok
+test_backup_due_at_final_step_even_with_recent_ack (test_m82.M82Tests.test_backup_due_at_final_step_even_with_recent_ack) ... ok
+test_backup_lag_limit_status (test_m82.M82Tests.test_backup_lag_limit_status) ... ok
+test_bad_snapshot_never_published (test_m82.M82Tests.test_bad_snapshot_never_published) ... ok
+test_checkpoint_event_required_for_snapshot (test_m82.M82Tests.test_checkpoint_event_required_for_snapshot) ... ok
+test_continuous_command_line_guard_rejects_no_m83 (test_m82.M82Tests.test_continuous_command_line_guard_rejects_no_m83) ... M8.2 guard NO-GO: FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmpqbpi10zz/artifacts/m8/m81/preflight.json'
+ok
+test_corrupted_metrics_no_snapshot (test_m82.M82Tests.test_corrupted_metrics_no_snapshot) ... ok
+test_external_ack_rejects_wrong_sha (test_m82.M82Tests.test_external_ack_rejects_wrong_sha) ... ok
+test_finished_run_requires_final_offsite_ack (test_m82.M82Tests.test_finished_run_requires_final_offsite_ack) ... ok
+test_gate_blocks_continuous_before_recovery (test_m82.M82Tests.test_gate_blocks_continuous_before_recovery) ... ok
+test_gate_requires_remote_preflight (test_m82.M82Tests.test_gate_requires_remote_preflight) ... ok
+test_incomplete_checkpoint_too_small (test_m82.M82Tests.test_incomplete_checkpoint_too_small) ... ok
+test_metrics_checkpoint_triggers_snapshot_once (test_m82.M82Tests.test_metrics_checkpoint_triggers_snapshot_once) ... ok
+test_missing_checkpoint_receipt_fails (test_m82.M82Tests.test_missing_checkpoint_receipt_fails) ... ok
+test_missing_moe_bias_is_hard_failure (test_m82.M82Tests.test_missing_moe_bias_is_hard_failure) ... ok
+test_moe_diversity_balanced (test_m82.M82Tests.test_moe_diversity_balanced) ... ok
+test_moe_diversity_concentrated_warning_not_stop (test_m82.M82Tests.test_moe_diversity_concentrated_warning_not_stop) ... ok
+test_monitor_nonfinite_grad_reject (test_m82.M82Tests.test_monitor_nonfinite_grad_reject) ... ok
+test_monitor_overflow_reject (test_m82.M82Tests.test_monitor_overflow_reject) ... ok
+test_no_unchanged_tar_recipe_required_in_this_overlay (test_m82.M82Tests.test_no_unchanged_tar_recipe_required_in_this_overlay) ... ok
+test_offsite_due_first_and_third_checkpoint (test_m82.M82Tests.test_offsite_due_first_and_third_checkpoint) ... ok
+test_persistent_validation_deterioration_warns (test_m82.M82Tests.test_persistent_validation_deterioration_warns) ... ok
+test_production_paths_are_fixed (test_m82.M82Tests.test_production_paths_are_fixed) ... ok
+test_rejects_wrong_step_in_snapshot (test_m82.M82Tests.test_rejects_wrong_step_in_snapshot) ... ok
+test_retention_only_removes_verified_oldest (test_m82.M82Tests.test_retention_only_removes_verified_oldest) ... ok
+test_retention_requires_external_backup (test_m82.M82Tests.test_retention_requires_external_backup) ... ok
+test_step_cadence (test_m82.M82Tests.test_step_cadence) ... ok
+test_supervisor_fails_closed_when_training_process_fails (test_m82.M82Tests.test_supervisor_fails_closed_when_training_process_fails) ... ok
+test_supervisor_stops_after_first_checkpoint (test_m82.M82Tests.test_supervisor_stops_after_first_checkpoint) ... ok
+test_tail_committed_corruption_fails (test_m82.M82Tests.test_tail_committed_corruption_fails) ... ok
+test_tail_incomplete_line_defers (test_m82.M82Tests.test_tail_incomplete_line_defers) ... ok
+
+----------------------------------------------------------------------
+Ran 36 tests in 1.285s
+
+OK
+
+M8.2 LOCAL PASS. No SSH, GPU, training, or checkpoint was accessed.
+test_final_mismatched_remote_receipt_blocks_shutdown (test_m83.FinalReceiverTests.test_final_mismatched_remote_receipt_blocks_shutdown) ... ok
+test_final_missing_offsite_file_blocks_shutdown (test_m83.FinalReceiverTests.test_final_missing_offsite_file_blocks_shutdown) ... ok
+test_final_offsite_corruption_blocks_shutdown (test_m83.FinalReceiverTests.test_final_offsite_corruption_blocks_shutdown) ... ok
+test_final_offsite_sha_verified (test_m83.FinalReceiverTests.test_final_offsite_sha_verified) ... ok
+test_drill_approval_requires_probe_file (test_m83.M83Tests.test_drill_approval_requires_probe_file) ... ok
+test_drill_detects_modified_m7_source (test_m83.M83Tests.test_drill_detects_modified_m7_source) ... ok
+test_drill_fails_before_offsite_ack (test_m83.M83Tests.test_drill_fails_before_offsite_ack) ... ok
+test_drill_fails_checkpoint_last_mismatch (test_m83.M83Tests.test_drill_fails_checkpoint_last_mismatch) ... ok
+test_drill_fails_if_manifest_from_fresh_training (test_m83.M83Tests.test_drill_fails_if_manifest_from_fresh_training) ... ok
+test_drill_fails_if_runner_not_stopped (test_m83.M83Tests.test_drill_fails_if_runner_not_stopped) ... ok
+test_drill_go_authorized_after_proof (test_m83.M83Tests.test_drill_go_authorized_after_proof) ... ok
+test_end_to_end_mock_drill_backup_proof_continuation_and_final (test_m83.M83Tests.test_end_to_end_mock_drill_backup_proof_continuation_and_final) ... ok
+test_final_audit_happy_path (test_m83.M83Tests.test_final_audit_happy_path) ... ok
+test_final_audit_rejects_missing_validation (test_m83.M83Tests.test_final_audit_rejects_missing_validation) ... ok
+test_final_audit_requires_final_backup (test_m83.M83Tests.test_final_audit_requires_final_backup) ... ok
+test_final_evidence_zip_excludes_weights (test_m83.M83Tests.test_final_evidence_zip_excludes_weights) ... ok
+test_forged_simple_pass_rejected (test_m83.M83Tests.test_forged_simple_pass_rejected) ... ok
+test_incident_refuses_unapproved_prior_state (test_m83.M83Tests.test_incident_refuses_unapproved_prior_state) ... ok
+test_incident_refuses_without_offsite_copy (test_m83.M83Tests.test_incident_refuses_without_offsite_copy) ... ok
+test_incident_resume_from_verified_snapshot (test_m83.M83Tests.test_incident_resume_from_verified_snapshot) ... ok
+test_last_checkpoint_corruption_blocks_start (test_m83.M83Tests.test_last_checkpoint_corruption_blocks_start) ... ok
+test_local_drill_recovers_required_context (test_m83.M83Tests.test_local_drill_recovers_required_context) ... ok
+test_missing_snapshot_blocks_gate (test_m83.M83Tests.test_missing_snapshot_blocks_gate) ... ok
+test_probe_tampering_invalidates_go (test_m83.M83Tests.test_probe_tampering_invalidates_go) ... ok
+test_probe_wrong_checkpoint_metadata_rejected (test_m83.M83Tests.test_probe_wrong_checkpoint_metadata_rejected) ... ok
+test_probe_wrong_gpu_rejected (test_m83.M83Tests.test_probe_wrong_gpu_rejected) ... ok
+test_probe_wrong_optimizer_rejected (test_m83.M83Tests.test_probe_wrong_optimizer_rejected) ... ok
+test_probe_wrong_rng_rejected (test_m83.M83Tests.test_probe_wrong_rng_rejected) ... ok
+test_run_probe_must_be_true_process_not_fixture (test_m83.M83Tests.test_run_probe_must_be_true_process_not_fixture) ... ok
+test_simple_replay_of_approval_refused (test_m83.M83Tests.test_simple_replay_of_approval_refused) ... ok
+test_full_deployment_has_all_phase_scripts (test_m83.StaticDeliveryTests.test_full_deployment_has_all_phase_scripts) ... ok
+test_incident_may_restore_4096_if_new_run_ends_early (test_m83.StaticDeliveryTests.test_incident_may_restore_4096_if_new_run_ends_early) ... ok
+test_no_unapproved_training_entrypoint (test_m83.StaticDeliveryTests.test_no_unapproved_training_entrypoint) ... ok
+test_windows_fsync_patch_packaged (test_m83.StaticDeliveryTests.test_windows_fsync_patch_packaged) ... ok
+
+----------------------------------------------------------------------
+Ran 34 tests in 1.350s
+
+OK
+
+M8.3 LOCAL PASS. Neither SSH nor a production checkpoint or GPU was used.
+Remote H100 restore, first independent 4096 backup and GO are still PENDING.

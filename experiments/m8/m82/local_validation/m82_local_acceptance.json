@@ -1,0 +1,14 @@
+{
+  "milestone": "M8.2",
+  "scope": "local_offline_only",
+  "status": "PASS",
+  "unit_and_integration_tests": 36,
+  "failed_tests": 0,
+  "m81_still_validated": true,
+  "gpu_accessed": false,
+  "ssh_used": false,
+  "training_started": false,
+  "remote_validation": "PENDING",
+  "live_recovery": "PENDING_M8.3",
+  "warning": "Synthetic training and fake snapshots, not a real checkpoint/GPU/Vast test"
+}
