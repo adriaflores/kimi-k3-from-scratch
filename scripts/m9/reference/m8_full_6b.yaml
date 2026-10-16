@@ -1,0 +1,34 @@
+# M7.5 proposal for M8, preserving M7.3 recipe and optimizer/schedule.
+# Only max_steps and log/eval/checkpoint cadence differ from M7.3.
+# DO NOT launch training until resume probe PASSES and M7.5 GO is issued.
+batch_size: 32
+seq_len: 1024
+learning_rate: 0.003
+weight_decay: 0.1
+max_steps: 183106
+log_interval: 64
+eval_interval: 512
+eval_batches: 8
+checkpoint_interval: 4096
+overfit_batch: false
+gradient_accumulation_steps: 1
+precision: bf16
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_eps: 1.0e-08
+adam_fused: true
+muon_momentum: 0.95
+muon_ns_steps: 5
+muon_ns_dtype: bf16
+muon_compile: true
+muon_batched: true
+muon_batch_size: 32
+muon_batch_max_mb: 64
+qk_clip_threshold: 100.0
+qk_clip_chunk_size: 256
+lr_schedule: cosine
+warmup_steps: 1832
+decay_steps: 183106
+min_lr_ratio: 0.1
+max_grad_norm: 1.0
+seed: 1337
