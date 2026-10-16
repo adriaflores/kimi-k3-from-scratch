@@ -245,3 +245,43 @@ html[data-theme="light"] .arch-schematic,html[data-theme="light"] .results-index
  .site-footer .footer-end{margin-top:0}
 }
 @media(prefers-reduced-motion:reduce){.gateway-card{transition:none}.gateway-card:hover{transform:none}}
+
+/* M1.2: structural chapter rendering. The richer reading/visual system is M1.3. */
+.chapter-title-link{color:inherit;text-decoration:none}
+.chapter-title-link:hover{color:var(--accent)}
+.empty-chapters{margin:20px clamp(22px,5.2vw,84px) 80px;padding:28px;border:1px solid var(--rule);background:var(--surface-card);color:var(--muted);max-width:810px;line-height:1.75}
+.chapter-shell{padding:46px clamp(22px,5.2vw,84px) 90px}
+.chapter-breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:12px;font:11px/1.5 var(--mono);color:var(--muted)}
+.chapter-breadcrumb a{text-decoration:none;color:var(--accent)}
+.chapter-header{max-width:930px;padding:65px 0 52px;border-bottom:1px solid var(--rule)}
+.chapter-header h1{font:400 clamp(48px,6vw,82px)/1.1 var(--serif);letter-spacing:-.055em;color:var(--ink);margin:20px 0}
+.chapter-lead{font:400 clamp(20px,2.3vw,30px)/1.45 var(--serif);color:var(--ink);margin:16px 0 20px}
+.chapter-summary{color:var(--muted);font-size:15px;line-height:1.85;max-width:700px;margin:0}
+.chapter-draft{font:11px/1.6 var(--mono);border-left:2px solid var(--accent);color:var(--muted);padding:11px 15px;margin-top:30px;background:var(--surface-card)}
+.chapter-reading-grid{display:grid;grid-template-columns:minmax(170px,220px) minmax(0,810px);gap:clamp(30px,5.5vw,78px);padding-top:49px;align-items:start}
+.chapter-reading-grid:has(> .chapter-body:first-child){grid-template-columns:minmax(0,810px)}
+.chapter-toc{position:sticky;top:35px;border-right:1px solid var(--rule);padding-right:24px;max-height:calc(100vh - 70px);overflow-y:auto}
+.chapter-toc-label{font:600 10px/1.4 var(--mono);letter-spacing:.11em;color:var(--accent);margin-bottom:22px}
+.chapter-toc-link{display:block;text-decoration:none;font-size:12px;line-height:1.55;color:var(--muted);margin:0 0 15px;overflow-wrap:anywhere}
+.chapter-toc-subsection{padding-left:14px;font-size:11px}
+.chapter-toc-link:hover{color:var(--accent)}
+.chapter-body{max-width:810px;min-width:0;color:var(--muted);font-size:16px;line-height:1.85}
+.chapter-body h2,.chapter-body h3{scroll-margin-top:35px;color:var(--ink)}
+.chapter-body h2{font:400 30px/1.25 var(--serif);margin:53px 0 18px;padding-top:27px;border-top:1px solid var(--rule)}
+.chapter-body h3{font:600 18px/1.4 var(--sans);margin:30px 0 14px}
+.chapter-body p{margin:15px 0}
+.chapter-body strong{color:var(--ink)}
+.chapter-body a{color:var(--accent)}
+.chapter-body code:not(pre code){background:var(--surface-card);border:1px solid var(--rule);color:var(--ink)}
+.chapter-body pre{background:var(--surface-card);border:1px solid var(--rule);max-width:100%;overflow-x:auto}
+.chapter-body pre code{color:var(--ink)}
+.chapter-body blockquote{background:var(--surface-card);color:var(--muted);border-left:2px solid var(--accent)}
+.chapter-body img{max-width:100%;height:auto}
+.chapter-footer-nav{display:grid;grid-template-columns:1fr 1fr;gap:30px;border-top:1px solid var(--rule);margin-top:64px;padding-top:24px;max-width:1050px}
+.chapter-footer-nav>div:last-child{text-align:right}
+.chapter-footer-nav a{display:inline-flex;flex-direction:column;gap:7px;text-decoration:none}
+.chapter-footer-nav a span{font:11px var(--mono);color:var(--accent)}
+.chapter-footer-nav a strong{font:500 16px var(--sans);color:var(--ink)}
+.chapter-footer-nav a:hover strong{color:var(--accent)}
+@media(max-width:850px){.chapter-reading-grid{grid-template-columns:minmax(0,1fr);gap:12px}.chapter-toc{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--rule);padding:0 0 24px}.chapter-toc-link{display:inline-block;margin:7px 17px 7px 0}.chapter-toc-subsection{padding-left:0}.chapter-header{padding:45px 0 35px}}
+@media(max-width:500px){.chapter-shell{padding-top:28px;padding-bottom:60px}.chapter-header h1{font-size:46px}.chapter-reading-grid{padding-top:27px}.chapter-footer-nav{gap:15px}.chapter-body{font-size:15px}}

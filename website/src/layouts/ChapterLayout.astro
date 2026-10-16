@@ -1,185 +1,45 @@
 ---
-import "katex/dist/katex.min.css";
-import "../styles/article.css";
+import SiteLayout from "./SiteLayout.astro";
+import { chapterHref, type ChapterCollection, type ChapterEntry } from "../lib/chapters";
 
-const {
-  headings = [],
-  chapterNumber,
-  title,
-  intro,
-  draft,
-  readingTime,
-} = Astro.props;
+interface Heading { depth: number; slug: string; text: string }
+interface Props {
+  section: ChapterCollection;
+  entry: ChapterEntry;
+  headings: Heading[];
+  previous?: ChapterEntry;
+  next?: ChapterEntry;
+}
 
-let parent = "";
-
-const toc = headings
-  .filter((heading) => heading.depth >= 2 && heading.depth <= 3)
-  .map((heading) => {
-	const cleanText = heading.text.replace(/#$/, "");
-
-	const match = cleanText.match(/^0*(\d+(?:\.\d+)?)\.?\s*(.*)$/);
-
-	const number = match?.[1] ?? "";
-	const label = match?.[2] ?? cleanText;
-
-    if (heading.depth === 2) {
-      parent = heading.slug;
-    }
-
-    return {
-      ...heading,
-      number,
-      label,
-      parent,
-    };
-  });
+const { section, entry, headings, previous, next } = Astro.props;
+const sectionLabel = section === "architecture" ? "Architecture" : "Training";
+const toc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+const inDevelopment = import.meta.env.DEV && entry.data.status !== "published";
 ---
-
-<html lang="en">
-  <head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width" />
-	<meta name="theme-color" content="#ffffff" />
-	<title>Kimi Delta Attention · Kimi K3, from paper to PyTorch</title>
-  </head>
-
-  <body>
-	<a class="skip-link" href="#chapter">Skip to article</a>
-
-	<header class="masthead">
-	  <a href="#top" class="wordmark">
-		<span class="mark">K3</span>
-		<span>
-		  Kimi K3
-		  <span class="brand-subtitle">From paper to PyTorch</span>
-		</span>
-	  </a>
-	</header>
-
-	<div class="page" id="top">
-	  <aside class="contents">
-		<div class="contents-inner">
-		  <a class="chapter-marker" href="#top">
-			<span>{chapterNumber}</span> {title}
-		  </a>
-
-		  <div class="contents-label">IN THIS CHAPTER</div>
-
-		  <nav id="toc" aria-label="Table of contents">
-			{
-				toc.map((item) => (
-				<a
-					class:list={[
-					"toc-link",
-					{ "toc-sub": item.depth === 3 },
-					]}
-					href={`#${item.slug}`}
-					data-parent={item.parent}
-				>
-					<span class="toc-number">{item.number}</span>
-					<span>{item.label}</span>
-				</a>
-				))
-			}
-			</nav>
-
-		  <div class="contents-bottom">
-			<span class="small-label">PRIMARY PAPERS</span>
-
-			<a
-			  href="https://arxiv.org/abs/2510.26692v2"
-			  target="_blank"
-			>
-			  Kimi Linear ↗
-			</a>
-
-			<a
-			  href="https://arxiv.org/abs/2607.24653v2"
-			  target="_blank"
-			>
-			  Kimi K3 ↗
-			</a>
-		  </div>
-		</div>
-	  </aside>
-
-	  <main class="reading">
-		<header class="article-header">
-		  <div class="eyebrow">
-			<span>ARCHITECTURE NOTES</span>
-			<span class="eyebrow-line"></span>
-			<span>CHAPTER {chapterNumber}</span>
-		  </div>
-
-		  <h1>
-			Kimi Delta<br />
-			Attention<span class="title-period">.</span>
-		  </h1>
-
-		  <p class="dek">{intro}</p>
-
-		  <div class="byline">
-			<span>Adrià Flores</span>
-			<span class="byline-divider"></span>
-			<span>{readingTime} min read</span>
-			<span class="draft-tag">{draft.split("·")[0].trim()}</span>
-		  </div>
-		</header>
-
-		<article id="chapter" class="prose">
-		  <slot />
-		</article>
-
-		<footer class="article-footer">
-		  <span>01 / Kimi Delta Attention</span>
-		  <a href="#top">Back to top ↑</a>
-
-		  <p>Part of <strong>Kimi K3: from paper to PyTorch.</strong></p>
-		  <p>An independent technical reading of the papers.</p>
-		</footer>
-	  </main>
-	</div>
-
-	<script>
-	const tracked = [...document.querySelectorAll("#chapter h2, #chapter h3")];
-	const links = [...document.querySelectorAll("#toc .toc-link")];
-
-	function updateToc() {
-		if (!tracked.length) return;
-
-		let active = tracked[0];
-
-		for (const heading of tracked) {
-		if (heading.getBoundingClientRect().top < 160) {
-			active = heading;
-		} else {
-			break;
-		}
-		}
-
-		const activeLink = links.find(
-		(link) => link.hash === `#${active.id}`
-		);
-
-		const group = activeLink?.dataset.parent;
-
-		links.forEach((link) => {
-		const selected = link.hash === `#${active.id}`;
-
-		link.classList.toggle("active", selected);
-
-		link.classList.toggle(
-			"current-group",
-			link.classList.contains("toc-sub") &&
-			link.dataset.parent === group
-		);
-		});
-	}
-
-	window.addEventListener("scroll", updateToc, { passive: true });
-	updateToc();
-	</script>
-
-  </body>
-</html>
+<SiteLayout current={section} title={`${entry.data.title} — Kimi K3 from Scratch`} description={entry.data.description}>
+  <div class="chapter-shell">
+    <nav aria-label="Breadcrumb" class="chapter-breadcrumb">
+      <a href="/">Home</a><span aria-hidden="true">/</span><a href={`/${section}/`}>{sectionLabel}</a><span aria-hidden="true">/</span><span aria-current="page">{entry.data.title}</span>
+    </nav>
+    <header class="chapter-header">
+      <div class="chapter-eyebrow">{sectionLabel} / {String(entry.data.order).padStart(2, "0")}</div>
+      <h1>{entry.data.title}</h1>
+      <p class="chapter-lead">{entry.data.question}</p>
+      <p class="chapter-summary">{entry.data.description}</p>
+      {inDevelopment && <p class="chapter-draft" role="status">Editorial preview · {entry.data.status}. This chapter is not included in the production site.</p>}
+    </header>
+    <div class="chapter-reading-grid">
+      {toc.length > 0 && <aside class="chapter-toc" aria-label="On this page">
+        <div class="chapter-toc-label">ON THIS PAGE</div>
+        <nav aria-label="Chapter sections">
+          {toc.map((heading) => <a class:list={["chapter-toc-link", { "chapter-toc-subsection": heading.depth === 3 }]} href={`#${heading.slug}`}>{heading.text}</a>)}
+        </nav>
+      </aside>}
+      <article class="chapter-body doc-prose"><slot /></article>
+    </div>
+    <nav class="chapter-footer-nav" aria-label="Adjacent chapters">
+      <div>{previous && <a href={chapterHref(section, previous.id)}><span>← Previous</span><strong>{previous.data.title}</strong></a>}</div>
+      <div>{next && <a href={chapterHref(section, next.id)}><span>Next →</span><strong>{next.data.title}</strong></a>}</div>
+    </nav>
+  </div>
+</SiteLayout>

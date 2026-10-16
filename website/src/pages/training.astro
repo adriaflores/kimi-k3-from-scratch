@@ -1,24 +1,18 @@
 ---
 import SiteLayout from "../layouts/SiteLayout.astro";
-const phases = [
-  { num: "01", id: "pipeline", title: "The training loop", lead: "Make the model learn.", detail: "Dataset selection and tokenization, memory-mapped shards, dataloader, forward/backward, optimizer groups and the first working training circuit.", artifacts: "Data pipeline · Loss · Muon / AdamW" },
-  { num: "02", id: "reliability", title: "Reliable experiments", lead: "Know what happened — and recover it.", detail: "Monitoring, expert-routing metrics, validation, checkpointing, resume, RNG/data cursors and profiling are integrated before any long run.", artifacts: "Metrics · Checkpoints · Resume · Profiling" },
-  { num: "03", id: "optimizations", title: "Performance optimization", lead: "Turn correctness into throughput.", detail: "Measure and optimize bottlenecks: the fused GPU KDA implementation, the Muon update path, memory usage and the effective training batch.", artifacts: "FLA KDA · Batched/compiled Muon · GPU profiling" },
-  { num: "04", id: "scaling", title: "Scaling experiments", lead: "Choose a defensible recipe.", detail: "Run bounded proxy and learning-rate/batch studies to inform the full-sized experiment, recording what comparisons can and cannot establish.", artifacts: "Proxy runs · LR × batch · Recipe selection" },
-  { num: "05", id: "qualification", title: "Production GPU qualification", lead: "Test the real operating conditions.", detail: "Establish the target-GPU environment; validate throughput, memory, cost, data movement, checkpoint safety and exact continuation.", artifacts: "H100 NVL · Target batch · Operational recovery" },
-  { num: "06", id: "pretraining", title: "Pilot → full pretraining", lead: "Execute with evidence.", detail: "Validate an 80M-token pilot, make a go/no-go decision, restore its complete state and carry out the 6B-token training horizon.", artifacts: "80M pilot · Scientific gate · 6B run" },
-];
+import { chapterHref, getVisibleChapters } from "../lib/chapters";
+const chapters = await getVisibleChapters("training");
 ---
-<SiteLayout current="training" title="Training — Kimi K3 from Scratch" description="The six-phase engineering and experimentation journey from training-loop implementation to full pretraining.">
-  <section class="page-intro"><div class="page-kicker">02 / THE PROCESS</div><h1>Building the <em>training system.</em></h1><p>Pretraining was not one script and one launch. It required a sequence of engineering decisions, controlled experiments and operational gates. This section follows that sequence.</p></section>
-  <nav class="chapter-index training-index" aria-label="Training phases">
-    {phases.map(phase => <a href={`#${phase.id}`}><span>{phase.num}</span> {phase.title} <span>↗</span></a>)}
-  </nav>
-  <div class="training-phases">
-    {phases.map(phase => <section class="training-phase" id={phase.id}>
-      <div class="phase-number">{phase.num}<span class="phase-stem" aria-hidden="true"></span></div>
-      <div class="phase-copy"><div class="chapter-eyebrow">{phase.title}</div><h2>{phase.lead}</h2><p>{phase.detail}</p><div class="phase-artifacts">{phase.artifacts}</div></div>
+<SiteLayout current="training" title="Training — Kimi K3 from Scratch" description="The engineering and experimentation journey from training-loop implementation to full pretraining.">
+  <section class="page-intro"><div class="page-kicker">02 / THE PROCESS</div><h1>Building the <em>training system.</em></h1><p>Pretraining was not one script and one launch. It required engineering decisions, controlled experiments, and operational gates. This section explains the reasoning behind that sequence.</p></section>
+  {chapters.length > 0 && <nav class="chapter-index training-index" aria-label="Training chapters">
+    {chapters.map((chapter) => <a href={chapterHref("training", chapter.id)}><span>{String(chapter.data.order).padStart(2, "0")}</span> {chapter.data.title} <span>↗</span></a>)}
+  </nav>}
+  {chapters.length > 0 ? <div class="training-phases">
+    {chapters.map((chapter) => <section class="training-phase">
+      <div class="phase-number">{String(chapter.data.order).padStart(2, "0")}<span class="phase-stem" aria-hidden="true"></span></div>
+      <div class="phase-copy"><div class="chapter-eyebrow">{chapter.data.title}</div><h2><a class="chapter-title-link" href={chapterHref("training", chapter.id)}>{chapter.data.question}</a></h2><p>{chapter.data.description}</p><div class="phase-artifacts">{import.meta.env.DEV && chapter.data.status !== "published" ? `EDITORIAL ${chapter.data.status.toUpperCase()} · ` : ""}<a class="chapter-source" href={chapterHref("training", chapter.id)}>Read chapter →</a></div></div>
     </section>)}
-  </div>
-  <div class="page-endnote">Individual phases will gain their own diagrams, methodology, source references and in-context measurements. Aggregate evidence belongs in <a href="/results/">Results ↗</a>.</div>
+  </div> : <p class="empty-chapters">Training chapters are being prepared and reviewed. Only evidence-reviewed chapters will appear in the published index.</p>}
+  <div class="page-endnote">Individual phases will connect decisions to actual code, methodology and measurements. Aggregate evidence belongs in <a href="/results/">Results ↗</a>.</div>
 </SiteLayout>
