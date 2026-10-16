@@ -1,6 +1,6 @@
 # Kimi K3 website — M1.1 Content and editorial contract
 
-**Version:** 1.1 — 16 October 2026  
+**Version:** 1.2 — 16 October 2026  
 **Status:** Design contract; not integrated into GitHub.  
 **Basis:** Kimi K3 site v3 overlay and its roadmap.  
 **Scope:** Architecture and Training chapters. Results use the same evidence principles, but their data manifest is intentionally deferred to M1.4/R1.
@@ -241,3 +241,11 @@ M1.2 must specify and implement the dev/production rendering rules for these sta
 **M1.6:** build, links, responsive QA and reusable handoff.
 
 **Integration prerequisite:** apply/reconcile the v3 overlay before treating the `main` branch as the v3 site. As inspected on 16 October 2026, `main` still has `paper-to-code.astro` and `engineering.astro` and no Architecture/Training content collections. Nothing in this contract was committed or deployed.
+
+## M1.3 addition — shared reading patterns
+
+The **reading/visual vocabulary** is defined in [`READING_STYLE.md`](READING_STYLE.md). It is mandatory for chapter authors and shared across Architecture and Training: semantic figure/caption markup, Math/KaTeX, code blocks with dual syntax themes, restrained callouts, an optional native self-check, and accessible behavior on desktop and mobile. These are generic Markdown/HTML conventions, not custom Astro pages. M1.4 still owns final paper/code/test citation patterns and experimental figure provenance.
+
+## M1.4 addition — citation and figure provenance system
+
+See [FIGURES_AND_SOURCES.md](FIGURES_AND_SOURCES.md) for the final M1.4 authoring patterns, evidence requirements, three figure kinds, and the editorial/build checks. The site uses ordinary Markdown links plus semantic figures/source trails rather than adding a new citation syntax or dependencies. Results will use structured JSON evidence records with Markdown narrative **when R1 is implemented**; this milestone does not create unaudited measurements.

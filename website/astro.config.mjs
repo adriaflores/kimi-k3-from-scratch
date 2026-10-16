@@ -7,6 +7,9 @@ export default defineConfig({
   site: "https://kimi-k3.adriaflores.com",
   output: "static",
   markdown: {
+    shikiConfig: {
+      themes: { light: "one-light", dark: "one-dark-pro" },
+    },
     remarkPlugins: [remarkMath],
     rehypePlugins: [rehypeKatex, rehypeHeadings],
   },
