@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "datasets>=4.2",
-    "flash-linear-attention>=0.5.2",
     "huggingface-hub>=1.32.0",
     "matplotlib>=3.11.2",
     "numpy>=2.5.3",
@@ -15,7 +14,12 @@ dependencies = [
     "pyyaml>=6.0.3",
     "torch>=2.11.0",
     "transformers>=5.17.0",
-    "triton-windows>=3.6,<3.7",
+]
+
+[project.optional-dependencies]
+gpu = [
+    "flash-linear-attention>=0.5.2",
+    "triton-windows>=3.6,<3.7; sys_platform == 'win32'",
 ]
 
 [tool.uv.sources]

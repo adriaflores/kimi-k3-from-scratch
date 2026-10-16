@@ -314,7 +314,7 @@ html[data-theme="light"] .arch-schematic,html[data-theme="light"] .results-index
 .chapter-toc-link[aria-current="location"] { border-left-color:var(--accent); }
 .chapter-toc-start { display:inline-block; color:var(--muted); font-size:11px; text-decoration:none; margin:16px 0 0 10px; }
 .chapter-toc-start:hover { color:var(--accent); }
-.chapter-body.doc-prose { width:100%; max-width:72ch; min-width:0; justify-self:center; color:var(--muted); font:400 clamp(17px,1.36vw,18px)/1.78 var(--sans); overflow-wrap:break-word; }
+.chapter-body.doc-prose { width:100%; max-width:72ch; min-width:0; justify-self:center; color:var(--muted); font:400 clamp(17.75px,1.4vw,19px)/1.78 var(--sans); overflow-wrap:break-word; }
 .chapter-body.doc-prose > :first-child { margin-top:0; }
 .chapter-body.doc-prose p { margin:0 0 1.14em; }
 .chapter-body.doc-prose h2 { font:400 clamp(26px,2.6vw,34px)/1.25 var(--serif); letter-spacing:-.025em; color:var(--ink); margin:65px 0 22px; padding:25px 0 0; border-top:1px solid var(--rule); text-wrap:balance; }
@@ -378,7 +378,7 @@ html[data-theme="dark"] .chapter-body.doc-prose pre.astro-code span { color:var(
  .chapter-header { padding:43px 0 31px; }
  .chapter-header h1 { font-size:44px; }
  .chapter-lead { font-size:21px; }
- .chapter-body.doc-prose { font-size:16.75px; line-height:1.76; }
+ .chapter-body.doc-prose { font-size:17.25px; line-height:1.76; }
  .chapter-body.doc-prose h2 { margin-top:52px; font-size:27px; padding-top:23px; }
  .chapter-body.doc-prose pre { padding:18px 16px; }
  .chapter-body.doc-prose .reading-figure { margin:26px 0 32px; }

@@ -125,3 +125,6 @@ docs/notes/figures
 inputs/
 scripts/milestone5
 evidence/
+
+# ---- Generated profiling bundles ----
+/scripts/profile_followup_results.zip
