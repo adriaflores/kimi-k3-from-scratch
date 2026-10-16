@@ -1,17 +1,24 @@
 ---
 import SiteLayout from "../layouts/SiteLayout.astro";
+const phases = [
+  { num: "01", id: "pipeline", title: "The training loop", lead: "Make the model learn.", detail: "Dataset selection and tokenization, memory-mapped shards, dataloader, forward/backward, optimizer groups and the first working training circuit.", artifacts: "Data pipeline · Loss · Muon / AdamW" },
+  { num: "02", id: "reliability", title: "Reliable experiments", lead: "Know what happened — and recover it.", detail: "Monitoring, expert-routing metrics, validation, checkpointing, resume, RNG/data cursors and profiling are integrated before any long run.", artifacts: "Metrics · Checkpoints · Resume · Profiling" },
+  { num: "03", id: "optimizations", title: "Performance optimization", lead: "Turn correctness into throughput.", detail: "Measure and optimize bottlenecks: the fused GPU KDA implementation, the Muon update path, memory usage and the effective training batch.", artifacts: "FLA KDA · Batched/compiled Muon · GPU profiling" },
+  { num: "04", id: "scaling", title: "Scaling experiments", lead: "Choose a defensible recipe.", detail: "Run bounded proxy and learning-rate/batch studies to inform the full-sized experiment, recording what comparisons can and cannot establish.", artifacts: "Proxy runs · LR × batch · Recipe selection" },
+  { num: "05", id: "qualification", title: "Production GPU qualification", lead: "Test the real operating conditions.", detail: "Establish the target-GPU environment; validate throughput, memory, cost, data movement, checkpoint safety and exact continuation.", artifacts: "H100 NVL · Target batch · Operational recovery" },
+  { num: "06", id: "pretraining", title: "Pilot → full pretraining", lead: "Execute with evidence.", detail: "Validate an 80M-token pilot, make a go/no-go decision, restore its complete state and carry out the 6B-token training horizon.", artifacts: "80M pilot · Scientific gate · 6B run" },
+];
 ---
-<SiteLayout current="training" title="Training Systems — Kimi K3 from Scratch" description="Data, optimizer recipe, GPU performance, reproducibility, and the qualification path to a 6B-token training run.">
-  <section class="page-intro"><div class="page-kicker">03 / TRAINING SYSTEMS</div><h1>Making it <em>trainable.</em></h1><p>Implementing a model is only half the work. The training system turns it into a repeatable experiment: bounded data, selected optimizer settings, reliable GPU execution, measurable performance and safe continuation.</p></section>
-  <section class="content-section"><div class="section-rail"><span class="section-index">01 / THE PIPELINE</span><span class="rail-line"></span></div><div class="section-main"><div class="section-topline">ENGINEERING THE RUN</div><h2>From corpus to <em>checkpoint.</em></h2><div class="process-grid">
-    <div class="process-card"><span>01 / DATA</span><h3>Prepare the corpus</h3><p>FineWeb-Edu sampling, a pinned SmolLM2 tokenizer, deterministic splits and memory-mapped token shards.</p><a class="small-link" href="/docs/data/">Data reference ↗</a></div>
-    <div class="process-card"><span>02 / OPTIMIZATION</span><h3>Select the recipe</h3><p>Muon for hidden matrices, AdamW for auxiliary parameters, BF16 autocast, clipping, warmup and cosine decay.</p><a class="small-link" href="/docs/training/">Training reference ↗</a></div>
-    <div class="process-card"><span>03 / PERFORMANCE</span><h3>Qualify the GPU</h3><p>Benchmark the real model, measure throughput and memory, and choose changes based on controlled comparisons.</p><a class="small-link" href="https://github.com/adriaflores/kimi-k3-from-scratch/tree/main/experiments/m6">Qualification evidence ↗</a></div>
-    <div class="process-card"><span>04 / RELIABILITY</span><h3>Resume safely</h3><p>Save optimizer state, loader cursors, RNG and counters, and verify backups before extending the run.</p><a class="small-link" href="/docs/reproducibility/">Reproducibility ↗</a></div>
-  </div></div></section>
-  <section class="content-section"><div class="section-rail"><span class="section-index">02 / THE RECIPE</span><span class="rail-line"></span></div><div class="section-main"><div class="section-topline">PRETRAINING CONTRACT</div><h2>A carefully bounded <em>experiment.</em></h2><p class="section-lead">The 6B-token configuration follows preliminary training studies, target-GPU qualification and a completed 80M-token pilot. The final run continues from the pilot state rather than restarting.</p>
-    <div class="spec-grid"><div><strong>H100 NVL</strong><span>Target GPU</span></div><div><strong>BF16</strong><span>Compute precision</span></div><div><strong>32 × 1,024</strong><span>Tokens / update</span></div><div><strong>Muon + AdamW</strong><span>Hybrid optimizer</span></div><div><strong>3 × 10⁻³</strong><span>Peak learning rate</span></div><div><strong>6B</strong><span>Token horizon</span></div></div>
-    <p class="notice">The full training horizon and final model-quality evaluation are separate claims. The site reports the pilot as validated, and reserves final model-quality evidence for Results.</p>
-    <div class="section-next"><span>LOOKING FOR THE NUMBERS?</span><a class="text-link" href="/results/">Results & evaluation <span>↗</span></a></div>
-  </div></section>
+<SiteLayout current="training" title="Training — Kimi K3 from Scratch" description="The six-phase engineering and experimentation journey from training-loop implementation to full pretraining.">
+  <section class="page-intro"><div class="page-kicker">02 / THE PROCESS</div><h1>Building the <em>training system.</em></h1><p>Pretraining was not one script and one launch. It required a sequence of engineering decisions, controlled experiments and operational gates. This section follows that sequence.</p></section>
+  <nav class="chapter-index training-index" aria-label="Training phases">
+    {phases.map(phase => <a href={`#${phase.id}`}><span>{phase.num}</span> {phase.title} <span>↗</span></a>)}
+  </nav>
+  <div class="training-phases">
+    {phases.map(phase => <section class="training-phase" id={phase.id}>
+      <div class="phase-number">{phase.num}<span class="phase-stem" aria-hidden="true"></span></div>
+      <div class="phase-copy"><div class="chapter-eyebrow">{phase.title}</div><h2>{phase.lead}</h2><p>{phase.detail}</p><div class="phase-artifacts">{phase.artifacts}</div></div>
+    </section>)}
+  </div>
+  <div class="page-endnote">Individual phases will gain their own diagrams, methodology, source references and in-context measurements. Aggregate evidence belongs in <a href="/results/">Results ↗</a>.</div>
 </SiteLayout>

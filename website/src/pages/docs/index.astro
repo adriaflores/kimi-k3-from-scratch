@@ -1,14 +1,10 @@
 ---
 import SiteLayout from "../../layouts/SiteLayout.astro";
-const entries = [
-  {id:"architecture", category:"REFERENCE 01",title:"Architecture",subtitle:"Backbone components, layer schedule and source map."},
-  {id:"data", category:"REFERENCE 02",title:"Data pipeline",subtitle:"FineWeb-Edu preparation, tokenization, and sharded loading."},
-  {id:"training", category:"REFERENCE 03",title:"Training recipe",subtitle:"Optimizers, precision, schedule, monitoring and the 6B target."},
-  {id:"reproducibility", category:"REFERENCE 04",title:"Reproducibility",subtitle:"Checkpoints, continuation guarantees, tests, and provenance."},
-];
 ---
-<SiteLayout current="docs" title="Technical Documentation — Kimi K3 from Scratch" description="Concise technical references for the Kimi K3 from Scratch source code, data, training, and reproducibility.">
-  <section class="page-intro"><div class="page-kicker">05 / TECHNICAL REFERENCE</div><h1>Understand the <em>implementation.</em></h1><p>Concise documentation for readers of the repository: what each subsystem does, where it lives, what configuration it expects, and how we verify it. Mathematical tutorials and broader research articles belong in the author's personal blog.</p>
-  <div class="reference-grid">{entries.map(e => <a class="reference-card" href={`/docs/${e.id}/`}><div class="doc-tag">{e.category}</div><h3>{e.title} ↗</h3><p>{e.subtitle}</p></a>)}</div></section>
-  <section class="content-section"><div class="section-rail"><span class="section-index">SOURCE FIRST</span><span class="rail-line"></span></div><div class="section-main"><div class="section-topline">ONE SOURCE OF TRUTH</div><h2>Markdown in GitHub. <em>Better on the web.</em></h2><p class="section-lead">The reference pages are generated directly from Markdown files in the repository’s <code>docs/</code> directory. Edit the Markdown once; Astro handles the published reading experience.</p><a class="text-link" href="https://github.com/adriaflores/kimi-k3-from-scratch/tree/main/docs">Browse source documentation ↗</a></div></section>
+<SiteLayout title="Documentation deferred — Kimi K3 from Scratch" description="The source-level documentation will be published after the repository cleanup.">
+  <section class="page-intro">
+    <div class="page-kicker">TECHNICAL REFERENCE / DEFERRED</div>
+    <h1>Docs, <em>later.</em></h1>
+    <p>The file-by-file technical reference will be published after the source cleanup. For now, explore the <a href="/architecture/">architecture</a>, the <a href="/training/">training process</a> or the <a href="/results/">experimental evidence</a>.</p>
+  </section>
 </SiteLayout>

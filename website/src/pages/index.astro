@@ -1,73 +1,40 @@
 ---
 import SiteLayout from "../layouts/SiteLayout.astro";
-const layers = ["KDA","KDA","KDA","MLA","KDA","KDA","KDA","MLA","KDA","KDA","KDA","MLA","MLA"];
+const sections = [
+  { index: "01", title: "Architecture", href: "/architecture/", kicker: "THE MODEL", description: "From the mechanisms described in the paper to a working language backbone: hybrid attention, attention residuals, MoE, and model assembly." },
+  { index: "02", title: "Training", href: "/training/", kicker: "THE PROCESS", description: "From a first working training loop to instrumented experiments, scaling studies, GPU qualification, and full pretraining." },
+  { index: "03", title: "Results", href: "/results/", kicker: "THE EVIDENCE", description: "Implementation checks and experimental results throughout the development, with carefully distinguished final-model evaluation." },
+];
 ---
-<SiteLayout current="overview" title="Kimi K3 from Scratch — Research Engineering" description="Implementing, optimizing, and pretraining a scaled Kimi K3 language backbone in PyTorch, from the papers to a 6B-token training run.">
-  <section class="hero">
-    <div class="hero-content">
-      <div class="eyebrow"><span class="tiny-diamond"></span> INDEPENDENT RESEARCH ENGINEERING PROJECT <span class="eyebrow-rule"></span> 2026</div>
-      <h1>From the paper<br />to the <em>training run.</em></h1>
-      <p class="hero-lead">A ground-up implementation of the Kimi K3 language backbone, scaled to ~300M parameters. Built to understand the architecture, validate the mathematics, and run reproducible pretraining.</p>
-      <div class="hero-actions">
-        <a class="button-primary" href="/paper-to-code/">Explore Paper → Code <span>↗</span></a>
-        <a class="button-subtle" href="https://github.com/adriaflores/kimi-k3-from-scratch" target="_blank" rel="noopener noreferrer">View source on GitHub <span>↗</span></a>
+<SiteLayout title="Kimi K3 from Scratch — Project Index" description="A research engineering project index: architecture, training journey and experimental results.">
+  <section class="gateway-hero">
+    <div class="gateway-label"><span class="tiny-diamond"></span> INDEPENDENT RESEARCH ENGINEERING <span class="gateway-year">/ 2026</span></div>
+    <div class="gateway-grid">
+      <div>
+        <h1>Kimi K3<br /><em>from scratch.</em></h1>
+        <p>A scaled language backbone built in PyTorch, then brought through the engineering work required for pretraining. Explore the model, the process, and the evidence.</p>
+        <div class="gateway-links"><a href="https://github.com/adriaflores/kimi-k3-from-scratch" target="_blank" rel="noopener noreferrer">Explore source ↗</a><a href="https://adriaflores.com" target="_blank" rel="noopener noreferrer">About the author ↗</a></div>
       </div>
-      <div class="hero-caption"><span class="caption-line"></span> By <a href="https://adriaflores.com">Adrià Flores</a> <span class="caption-dot">·</span> PyTorch, CUDA &amp; language modeling</div>
-    </div>
-    <div class="hero-visual" aria-label="A schematic of a 13-layer Kimi K3 backbone, alternating Kimi Delta Attention and Gated Multi-head Latent Attention">
-      <div class="visual-topline"><span>ARCHITECTURE / 01</span><span>LANGUAGE BACKBONE</span></div>
-      <div class="diagram-stage">
-        <div class="diagram-input">Token embeddings <span class="diagram-arrow">↓</span></div>
-        <div class="layer-frame">
-          <div class="layer-frame-title"><span>13 DECODER LAYERS</span><span>ATTN + FFN</span></div>
-          <div class="layer-list">
-            {layers.map((layer, i) => <div class:list={["layer-row", layer === "MLA" && "layer-mla"]}><span class="layer-num">{String(i+1).padStart(2,"0")}</span><span class="layer-tag">{layer}</span><span class="layer-mid"></span><span class="layer-ffn">{i===0 ? "DENSE" : "MoE · 64"}</span></div>)}
-          </div>
-        </div>
-        <div class="diagram-output"><span class="diagram-arrow">↓</span> RMSNorm · LM head</div>
-      </div>
-      <div class="visual-bottomline"><span>3 × KDA → MLA, plus final MLA</span><span>NOT TO SCALE</span></div>
-    </div>
-  </section>
-
-  <section class="metrics-band" aria-label="Model specifications">
-    <div class="metric"><div class="metric-value">294.7<span>M</span></div><div class="metric-label">Total parameters</div></div>
-    <div class="metric"><div class="metric-value">100.4<span>M</span></div><div class="metric-label">Active per token · approx.</div></div>
-    <div class="metric"><div class="metric-value">13</div><div class="metric-label">Decoder layers</div></div>
-    <div class="metric"><div class="metric-value">6<span>B</span></div><div class="metric-label">Training token target</div></div>
-  </section>
-
-  <section class="content-section intro-section" id="approach">
-    <div class="section-rail"><span class="section-index">01 / THE IDEA</span><span class="rail-line"></span></div>
-    <div class="section-main"><div class="section-topline">WHY BUILD IT AGAIN?</div><h2>Understanding a model means <em>building one.</em></h2>
-      <p class="section-lead">The goal is not to reproduce the scale or performance of the original Kimi K3. It is to construct a smaller but representative language backbone, trace every major mechanism from research to working code, and study the practical demands of pretraining.</p>
-      <p>This project brings together hybrid attention, mixture-of-experts routing, attention residuals, numerical equivalence tests, a complete training pipeline, and the operational work required for an uninterrupted GPU run.</p>
-      <div class="callout-inline"><span class="callout-mark">↳</span><span><strong>Scope matters.</strong> The model and readable reference implementations are written in PyTorch. The production GPU path for KDA uses the optimized FLA Triton kernel; this project does not claim to implement every optimized kernel from scratch.</span></div>
-    </div>
-  </section>
-
-  <section class="content-section building-section">
-    <div class="section-rail"><span class="section-index">02 / THE SYSTEM</span><span class="rail-line"></span></div>
-    <div class="section-main"><div class="section-topline">THREE PARTS OF THE STORY</div><h2>Build it. Train it. <em>Verify it.</em></h2>
-      <div class="pillar-grid">
-        <article class="pillar"><div class="pillar-icon">01 <span>↗</span></div><h3>Paper → Code</h3><p>The research mechanisms, their readable PyTorch implementation and the tests validating them.</p><a href="/paper-to-code/">Explore Paper → Code ↗</a></article>
-        <article class="pillar"><div class="pillar-icon">02 <span>↗</span></div><h3>Validation</h3><p>Reference-vs-optimized equivalence, unit/integration tests and reproducible research evidence.</p><a href="/paper-to-code/">See the implementation ↗</a></article>
-        <article class="pillar"><div class="pillar-icon">03 <span>↗</span></div><h3>Training</h3><p>Data, Muon + AdamW, mixed precision, GPU throughput, recovery and the 6B-token training horizon.</p><a href="/training/">Explore training ↗</a></article>
+      <div class="gateway-diagram" aria-label="From paper to the model, training system and results">
+        <span class="visual-eyebrow">THE RESEARCH ENGINEERING PATH</span>
+        <div class="gateway-node">Paper & research mechanisms <span>01</span></div>
+        <div class="gateway-flow">↓</div>
+        <div class="gateway-node accent-node">Model implementation <span>02</span></div>
+        <div class="gateway-flow">↓</div>
+        <div class="gateway-node">Training system & experiments <span>03</span></div>
+        <div class="gateway-flow">↓</div>
+        <div class="gateway-node">Measured evidence <span>04</span></div>
       </div>
     </div>
   </section>
-
-  <section class="content-section status-section">
-    <div class="section-rail"><span class="section-index">03 / PROGRESS</span><span class="rail-line"></span></div>
-    <div class="section-main"><div class="section-topline">RESEARCH RECORD</div><h2>From verification to <em>pretraining.</em></h2>
-      <div class="timeline"><div class="timeline-item done"><span class="timeline-index">01</span><div><strong>Architecture &amp; trainer</strong><p>Backbone assembled, numerical checks and training tests in place.</p></div><span class="timeline-state">Completed</span></div>
-        <div class="timeline-item done"><span class="timeline-index">02</span><div><strong>GPU qualification</strong><p>Memory, throughput, checkpoint/recovery, and operational readiness.</p></div><span class="timeline-state">Completed</span></div>
-        <div class="timeline-item done"><span class="timeline-index">03</span><div><strong>80M-token pilot</strong><p>Learning and stability evidence reviewed before authorizing the full run.</p></div><span class="timeline-state">Completed</span></div>
-        <div class="timeline-item current"><span class="timeline-index">04</span><div><strong>6B-token pretraining</strong><p>Full training horizon underway; final results and model evaluation remain pending.</p></div><span class="timeline-state">In progress</span></div>
-        <div class="timeline-item"><span class="timeline-index">05</span><div><strong>Evaluation &amp; publication</strong><p>Model quality, limitations, comparisons, final report, and artifacts.</p></div><span class="timeline-state">Next</span></div>
-      </div>
-      <a class="text-link" href="/results/">Evaluation status &amp; planned reporting <span>↗</span></a>
+  <section class="gateway-sections" aria-label="Explore the project">
+    <div class="gateway-head"><span class="visual-eyebrow">EXPLORE THE PROJECT</span><span>Three routes into the work</span></div>
+    <div class="gateway-card-grid">
+      {sections.map(section => <a class="gateway-card" href={section.href}>
+        <div class="gateway-card-top"><span>{section.index} / {section.kicker}</span><span>↗</span></div>
+        <h2>{section.title}</h2><p>{section.description}</p><span class="gateway-card-bottom">Explore {section.title} →</span>
+      </a>)}
     </div>
+    <p class="gateway-note">This page is an index, not the final project overview. The overview and file-by-file reference documentation will be developed after the core sections stabilize.</p>
   </section>
-  <section class="closing-strip"><div><div class="section-topline">EXPLORE THE SOURCE</div><h2>Code, experiments, and decisions.<br /><em>All in one place.</em></h2></div><a class="button-primary" href="/docs/">Browse technical docs <span>↗</span></a></section>
 </SiteLayout>

@@ -1,26 +1,32 @@
-# Kimi K3 — Project site
+# Kimi K3 — Project website
 
-This directory contains the Astro site intended for `kimi-k3.adriaflores.com`.
+Astro site for the independent project at `kimi-k3.adriaflores.com`.
 
-Its purpose is to present the research engineering project and provide a polished rendering of the repository's **technical reference documentation**. It is intentionally separate from Adrià Flores' personal blog (`adriaflores.com/blog`), where independent educational deep dives will be published.
+## Information architecture (v3)
 
-- `src/pages/index.astro`: project landing page.
-- `src/pages/engineering.astro`: implementation and verification summary.
-- `src/pages/results.astro`: evaluation status and, later, final results.
-- `src/pages/docs/`: curated documentation, generated from `../docs/*.md`.
-- `src/layouts/SiteLayout.astro` and `src/styles/site.css`: visual system.
-- `DEPLOY.md`: local preview and Cloudflare Pages deployment instructions.
+- `/` — **gateway**, not the final Overview; introduces the project and links to its core sections.
+- `/architecture/` — paper-grounded mechanisms, implementation map and eventual `model.py` assembly.
+- `/training/` — six-phase engineering and experimentation journey, from first training loop to full pretraining.
+- `/results/` — grouped evidence for the architecture and **every training phase** (not just final evaluation).
+- `/docs/` — deliberately **deferred** until the source code cleanup. No file-level reference pages are published yet.
 
-From this directory, run `npm ci` followed by `npm run dev` or `npm run build`.
+`/paper-to-code/` and `/engineering/` redirect to the new routes for compatibility with the previous prototype.
 
-The existing `docs/01_kimi_delta_attention.md` is an early, partially outdated long-form draft and is **not** included in the new technical-reference navigation until its editorial destination has been decided. The original Markdown is preserved.
+The KDA article draft in `docs/01_kimi_delta_attention.md` is preserved in the repository but is not represented as finished reference documentation. Deep technical tutorials will live in the author's personal blog at `adriaflores.com/blog`.
 
-## v2 site information architecture
+## Visual system
 
-- `/`: the independent-project overview.
-- `/paper-to-code/`: architecture mechanisms, implementation map and validation (not a second mathematical blog).
-- `/training/`: data, recipe, GPU qualification and recovery work.
-- `/results/`: measured pilot evidence and final evaluation when available.
-- `/docs/`: concise source-linked Markdown technical reference.
+Near-black default theme, cool-blue accent, neutral card surfaces, optional persistent light mode. Shared styles are in `src/styles/site.css`, with the v3 token contract recorded in the root-level `ROADMAP_AND_CONTRACT.md` included with the patch.
 
-A persistent Light / Dark control follows the visitor's system preference until overridden. The selection is saved locally in the browser. `/engineering/` is kept as a backwards-compatible redirect to `/training/`.
+## Local commands
+
+```bash
+cd website
+npm ci
+npm run dev
+npm run build
+```
+
+The repo's existing `predev` and `prebuild` hooks sync images from `../assets/`.
+
+See `DEPLOY.md` for Cloudflare Pages steps, and `ROADMAP_AND_CONTRACT.md` for parallel-content workstreams.

@@ -1,0 +1,28 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+const sections = [
+  { anchor: "hybrid", num: "01", label: "Hybrid Attention", paper: "Kimi K3 · §2.1", heading: "Two ways to mix tokens.", description: "Kimi Delta Attention maintains and updates a fixed-size memory. Gated MLA supplies content-based attention. Our 13-layer model alternates KDA and MLA following the scaled backbone schedule.", modules: ["Kimi Delta Attention", "Gated MLA"], path: "src/kimi_k3/attention/" },
+  { anchor: "residuals", num: "02", label: "Attention Residuals", paper: "Kimi K3 · architecture", heading: "Residuals become learned reads.", description: "Attention Residuals replace simple accumulation with content-dependent aggregation over residual states and block prefixes, integrated in the decoder block.", modules: ["Blockwise AttnRes", "RMSNorm"], path: "src/kimi_k3/model.py" },
+  { anchor: "experts", num: "03", label: "Feed-Forward & MoE", paper: "Kimi K3 · architecture", heading: "Dense and sparse computation.", description: "The first decoder layer uses a dense SiTU-GLU FFN. Subsequent layers use Stable LatentMoE with shared experts, top-2 routing and Quantile Balancing.", modules: ["SiTU-GLU", "Stable LatentMoE", "Quantile Balancing"], path: "src/kimi_k3/moe/" },
+  { anchor: "assembly", num: "04", label: "Model Assembly", paper: "Kimi K3 · backbone", heading: "From components to model.py.", description: "We combine the token embedding, 13 mixed-attention decoder layers, normalization, and tied language-model head into a ~300M-parameter model.", modules: ["Decoder stack", "Layer schedule", "LM head"], path: "src/kimi_k3/model.py" },
+];
+const paperURL = "https://arxiv.org/abs/2607.24653v2";
+---
+<SiteLayout current="architecture" title="Architecture — Kimi K3 from Scratch" description="The implementation of the Kimi K3 language backbone, component by component, grounded in the architecture paper.">
+  <section class="page-intro"><div class="page-kicker">01 / THE MODEL</div><h1>The <em>architecture.</em></h1><p>From the language-backbone mechanisms in the Kimi K3 paper to the complete PyTorch model. Each chapter will connect the idea, its equations, implementation and validation.</p><div class="journey"><span>Paper §2</span><span>→</span><span>Mechanisms</span><span>→</span><span>Modules</span><span>→</span><span>model.py</span></div></section>
+  <nav class="chapter-index" aria-label="Architecture chapters">
+    {sections.map(section => <a href={`#${section.anchor}`}><span>{section.num}</span> {section.label} <span>↗</span></a>)}
+  </nav>
+  <section class="arch-schematic" aria-label="Simplified backbone structure">
+    <div class="schematic-head"><span class="visual-eyebrow">BACKBONE / ASSEMBLY</span><a href="https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/src/kimi_k3/model.py" target="_blank" rel="noopener noreferrer">model.py ↗</a></div>
+    <div class="schematic-flow"><div class="schematic-node">Token embeddings</div><span>→</span><div class="schematic-node schematic-primary">Hybrid Attention<br /><small>KDA / MLA</small></div><span>→</span><div class="schematic-node">AttnRes + FFN<br /><small>Dense / MoE</small></div><span>→</span><div class="schematic-node">Norm + LM head</div></div>
+    <p>Conceptual assembly, not a literal operation-by-operation graph. The paper-to-code explanations and validated diagrams will be developed as individual chapters.</p>
+  </section>
+  <div class="chapter-list">
+    {sections.map(section => <section class="chapter-row" id={section.anchor}>
+      <div class="chapter-rail"><span>{section.num} / ARCHITECTURE</span><span class="chapter-paper"><a href={paperURL} target="_blank" rel="noopener noreferrer">{section.paper} ↗</a></span></div>
+      <div class="chapter-main"><div class="chapter-eyebrow">{section.label}</div><h2>{section.heading}</h2><p>{section.description}</p><div class="chapter-tags">{section.modules.map(m => <span>{m}</span>)}</div><a class="chapter-source" href={`https://github.com/adriaflores/kimi-k3-from-scratch/tree/main/${section.path}`} target="_blank" rel="noopener noreferrer">Inspect current implementation ↗</a></div>
+    </section>)}
+  </div>
+  <div class="page-endnote">These are chapter foundations, not finished mathematical derivations. Exact equation cross-references, implementation examples and test evidence belong in the chapter milestones.</div>
+</SiteLayout>

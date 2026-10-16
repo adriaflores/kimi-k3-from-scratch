@@ -1,43 +1,37 @@
-# Kimi K3 project site — build and deploy
+# Build and deploy the Kimi K3 site
 
-This Astro project lives in `website/` within `adriaflores/kimi-k3-from-scratch`. The repository Markdown in `docs/` is the canonical source of the site's technical reference, loaded by `website/src/content.config.ts`.
+The Astro source is in `website/` inside `adriaflores/kimi-k3-from-scratch`.
 
-## Preview locally
+## Local verification
 
-At the repository root:
+From a complete clone of the repository:
 
 ```bash
 cd website
 npm ci
+npm run build
 npm run dev
 ```
 
-Open the local URL printed by Astro. Production build:
+The prebuild hook copies repo-owned figures from `../assets` to `public/assets`, so do not build from an isolated `website/` folder.
 
-```bash
-npm run build
-```
+Verify dark default and toggle persistence, mobile navigation, and these paths: `/`, `/architecture/`, `/training/`, `/results/`. The old `/paper-to-code/` and `/engineering/` paths should redirect. `/docs/` should show only a deferred notice.
 
-The existing `predev` / `prebuild` hook copies `../assets` into `public/assets`, so work from the complete repository clone rather than an isolated `website` folder.
+## Cloudflare Pages
 
-## Cloudflare Pages via GitHub
+1. Connect `adriaflores/kimi-k3-from-scratch` to a Cloudflare Pages project.
+2. Project root directory: `website`.
+3. Build command: `npm run build`; output directory: `dist` (relative to root).
+4. Use Node >=22.12.0 (for example an environment variable pin to a supported 22.x release).
+5. Test the Pages preview deployment before assigning the custom domain.
+6. In the Pages project's **Custom domains**, add `kimi-k3.adriaflores.com` and follow Cloudflare's DNS instructions.
+7. Check HTTPS, routes, redirect behavior and theme after the custom domain is active.
 
-1. In **Cloudflare → Workers & Pages → Create → Pages**, connect GitHub and choose `adriaflores/kimi-k3-from-scratch`.
-2. Set project **Root directory** to `website`.
-3. Set **Build command** to `npm run build` and **Build output directory** to `dist` (relative to the configured root).
-4. Set environment variable `NODE_VERSION=22` (the Astro package requires Node >=22.12).
-5. Confirm the Pages preview deployment is working before configuring the custom domain.
-6. Under the Pages project → **Custom domains**, add `kimi-k3.adriaflores.com`. Because `adriaflores.com` is already on Cloudflare, the CNAME can normally be created automatically after you confirm the association. Do not create the DNS CNAME by itself before registering the domain on the Pages project.
-7. Check `https://kimi-k3.adriaflores.com/`, `/engineering/`, `/results/`, `/docs/`, and `/docs/architecture/`.
+Cloudflare references: https://developers.cloudflare.com/pages/configuration/build-configuration/ and https://developers.cloudflare.com/pages/configuration/custom-domains/.
 
-Cloudflare documentation: https://developers.cloudflare.com/pages/configuration/build-configuration/ and https://developers.cloudflare.com/pages/configuration/custom-domains/.
+## Editorial safety
 
-## Editorial / technical boundaries
-
-- Do not publish final evaluation scores before final checkpoint identity and protocol are verified.
-- The results page is intentionally a placeholder; update it after M8/M9 evidence is available.
-- `docs/01_kimi_delta_attention.md` is an *early tutorial draft* and is not currently published as technical reference because it contains outdated implementation placeholders. Decide whether to migrate the revised deep dive to `adriaflores.com/blog` separately.
-- Technical reference: `docs/{architecture,data,training,reproducibility}.md`.
-- Project website UI: `website/src/`.
-- The repository retains the previous `website/src/layouts/ChapterLayout.astro` and `website/src/styles/article.css` for historical/reference use. Nothing is deleted by this patch.
-- Changes in `docs/`, `website/` or build tooling can be deployed independently of model training; **never change the active training checkpoint or recipe for a documentation deployment**.
+- Do not add or claim final-model scores without a verified checkpoint, protocol and source artifacts.
+- The Results page currently contains the validated 80M pilot result as an example of sourced evidence.
+- Overview and source-file Docs are deferred until Architecture/Training/Results and code cleanup permit reliable summaries.
+- Site deploys must not modify active training code, model checkpoints or recipe files.

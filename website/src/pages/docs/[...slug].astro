@@ -1,24 +1,5 @@
 ---
-import { getCollection, render } from "astro:content";
-import SiteLayout from "../../layouts/SiteLayout.astro";
-import "katex/dist/katex.min.css";
-const choices = [
- {id:"architecture",label:"Architecture"},
- {id:"data",label:"Data pipeline"},
- {id:"training",label:"Training recipe"},
- {id:"reproducibility",label:"Reproducibility"}
-];
-export async function getStaticPaths(){
- const docs = await getCollection("docs");
- return docs.filter(doc => choices.some(c => c.id === doc.id)).map(doc => ({ params: {slug:doc.id}, props: {entry:doc} }));
-}
-const {entry} = Astro.props;
-const {Content} = await render(entry);
-const display = choices.find(item=>item.id===entry.id)?.label ?? entry.id;
+// File-by-file reference pages are intentionally not generated yet.
+// Restore a Markdown-backed getStaticPaths() when the Docs milestone begins.
+export function getStaticPaths() { return []; }
 ---
-<SiteLayout current="docs" title={`${display} — Kimi K3 Documentation`} description={`Technical reference: ${display} for Kimi K3 from Scratch.`}>
-  <div class="body-shell"><div class="reading-grid">
-    <aside class="reading-sidebar"><div class="sidebar-sticky"><div class="sidebar-label">TECHNICAL REFERENCE</div><a href="/docs/">← All documentation</a>{choices.map(c=><a href={`/docs/${c.id}/`} class:list={{active:c.id===entry.id}} aria-current={c.id===entry.id?"page":undefined}>{c.label}</a>)}<div class="sidebar-label" style="margin-top:40px">SOURCE</div><a href={`https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/docs/${entry.id}.md`} target="_blank" rel="noopener noreferrer">View Markdown ↗</a></div></aside>
-    <article class="doc-article"><div class="doc-breadcrumb">KIMI K3 / DOCS / {display.toUpperCase()}</div><div class="doc-prose"><Content /></div></article>
-  </div></div>
-</SiteLayout>
