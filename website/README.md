@@ -31,7 +31,7 @@ The repo's existing `predev` and `prebuild` hooks sync images from `../assets/`.
 
 See `DEPLOY.md` for Cloudflare Pages steps, and `ROADMAP_AND_CONTRACT.md` for parallel-content workstreams.
 
-## Content development and production QA (M1.6)
+## Content development and production QA
 
 The approved editorial references are `../content/architecture/hybrid-attention.md` and `../content/training/training-loop.md`. Their Markdown content is previewable in `npm run dev` and remains **draft-only** in production.
 

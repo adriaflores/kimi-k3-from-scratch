@@ -6,7 +6,7 @@ The project distinguishes **re-running an experiment** from **resuming one witho
 
 The repository contains model and training YAMLs, a `uv.lock`, prepared data manifests, run metadata, and test suites. Runtime manifests record model/training settings, seed, software/hardware context, and source revision identity.
 
-Start with the repository’s [`README.md`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/README.md) for installation and basic commands. The canonical configuration of the full run is in [`experiments/m7/m75_gate/recipe/m8_full_6b.yaml`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/experiments/m7/m75_gate/recipe/m8_full_6b.yaml).
+Start with the repository’s [`README.md`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/README.md) for installation and basic commands. The canonical configuration of the full run is in [`experiments/pretraining/training.yaml`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/experiments/pretraining/training.yaml).
 
 ## Checkpoint contents and resume contract
 
@@ -35,6 +35,6 @@ These tests differ in hardware requirements. GPU kernel tests should be run on a
 
 ## Operational artifacts
 
-Qualification, pilot, and resume-gate evidence is preserved under `experiments/m6/`, `experiments/m7/`, and the associated scripts. Remote checkpoint files are not embedded into this website.
+The public tree retains the pilot scientific assessment and the original pilot/full-run recipes under `experiments/pilot/` and `experiments/pretraining/`. Frozen evaluation artifacts and one-off infrastructure are recoverable from Git history rather than distributed in the current tree. The original model checkpoints and prepared token shards are not included.
 
 Before claiming final reproduction, record the final checkpoint's SHA-256, exact dataset manifest hash, source commit, package environment, and evaluation procedure. These become part of the final results release.

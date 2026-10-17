@@ -1,4 +1,4 @@
-# Kimi K3 website — M1.4 figures, citations and evidence contract
+# Kimi K3 website — Figures, citations and evidence contract
 
 **Version:** 1.0 · 16 October 2026  
 **Applies to:** `content/architecture/*.md`, `content/training/*.md`, and future Results evidence records.  
@@ -92,15 +92,15 @@ Collect the chapter's primary verification links in one light, unobtrusive block
 
 For Training, replace Paper with `Run/experiment` when the question is chiefly operational. Do not force three entries if only two are meaningful. Inline links are still welcome next to the exact claims they support. Avoid hiding links behind unexplained icons or elaborate citation widgets.
 
-## 5. Experimental evidence — choice for Results (future R1)
+## 5. Experimental evidence — Results policy
 
-**Decision:** use **structured JSON evidence records** as the source of numerical claims, with Markdown for interpretation, links and narrative. This avoids manual duplication of values across Results and Training. M1.4 defines the intended contract; **no numerical Results pages, JSON manifests, or claims are created here**. R1 will implement the schema and link records to the actual run artifacts.
+**Decision:** use **structured JSON evidence records** as the source of numerical claims, with Markdown for interpretation, links and narrative. This avoids manual duplication of values across Results and Training. Records must be linked to real, reviewed artifacts before their numerical claims are published.
 
 A publishable evidence record must have: stable `id`, phase (`architecture-validation`, `training-reliability`, `optimization`, `scaling`, `qualification`, `pilot`, `final`), metric **and unit**, value(s), model and config revision, dataset/split, run ID/date, method, hardware/precision when material, provenance artifact/manifest URL, limitations and a conservative interpretation. Unknown values must remain unknown, not invented or silently filled. Label `pilot`, `proxy`, `qualification` and `final` explicitly. Charts may be generated from audited JSON records when the Results pipeline exists.
 
-To prevent contradictions, a chapter may summarize a vetted record but must not independently type a conflicting number. Before claiming a final result, check the experimental report and audit receipts from the relevant M7–M9 phases.
+To prevent contradictions, a chapter may summarize a vetted record but must not independently type a conflicting number. Before claiming a final result, check the experimental report and audit receipts from the pilot, full pretraining run and held-out evaluations.
 
-## 6. M1.4 static check and its limits
+## 6. Static checks and their limits
 
 From `website/`:
 

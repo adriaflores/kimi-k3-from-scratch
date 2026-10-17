@@ -4,7 +4,7 @@ This page records the validated recipe for the scaled ~300M-parameter Kimi K3 pr
 
 ## Full-run configuration
 
-The approved full-run YAML is [`experiments/m7/m75_gate/recipe/m8_full_6b.yaml`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/experiments/m7/m75_gate/recipe/m8_full_6b.yaml). The run continues from the verified 80M-token pilot checkpoint rather than restarting the weights or optimizer state.
+The approved full-run YAML is [`experiments/pretraining/training.yaml`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/experiments/pretraining/training.yaml). The run continues from the verified 80M-token pilot checkpoint rather than restarting the weights or optimizer state.
 
 | Setting | Value |
 |---|---:|
@@ -36,10 +36,10 @@ See [`src/kimi_k3/training/optimizers.py`](https://github.com/adriaflores/kimi-k
 
 The qualified runtime uses a single H100 NVL GPU through Vast.ai and the optimized FLA KDA path. Logs record loss, learning rate, gradient norm, throughput, memory use, expert loads, and Quantile Balancing diagnostics.
 
-The full-run YAML specifies logging every 64 updates, validation every 512 updates (8 batches), and checkpointing every 4,096 updates. Separate operational scripts can impose additional backup cadence and verification.
+The full-run YAML specifies logging every 64 updates, validation every 512 updates (8 batches), and checkpointing every 4,096 updates. The historical training run used additional backup and recovery procedures; those one-off scripts are not part of the current public toolkit.
 
 The training entry point is [`scripts/train.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/scripts/train.py); the core trainer resides in [`src/kimi_k3/training/trainer.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/src/kimi_k3/training/trainer.py).
 
 ## Evidence boundary
 
-The 80M-token pilot was reviewed for learning, finite gradients, and MoE routing behavior before authorizing full continuation. Its validation measurements covered a repeated validation prefix, so the pilot should not be mistaken for a broad downstream evaluation. See the [M7.4 scientific decision](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/experiments/m7/m75_gate/docs/M7_4_scientific_decision.md).
+The 80M-token pilot was reviewed for learning, finite gradients, and MoE routing behavior before continuing the same training run. Its validation measurements covered a repeated validation prefix, so the pilot should not be mistaken for a broad downstream evaluation. See the [pilot scientific assessment](https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/experiments/pilot/scientific_assessment.md).

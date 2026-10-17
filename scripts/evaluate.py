@@ -1,6 +1,6 @@
 """Exploratory next-token NLL/PPL on prepared train/validation token shards.
 
-Not a reproduction of the frozen M9 held-out evaluation protocol.
+Not a reproduction of the original pre-registered held-out evaluation.
 """
 from __future__ import annotations
 

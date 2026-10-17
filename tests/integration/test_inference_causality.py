@@ -1,6 +1,6 @@
 """Causal suffix-invariance checks for the public inference entry point.
 
-The original M9 frozen protocol is archived in the pre-cleanup-m9 Git tag.
+The original frozen evaluation protocol is preserved in Git history.
 """
 
 import torch

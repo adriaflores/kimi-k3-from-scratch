@@ -1,6 +1,6 @@
 """General read-only inference utilities for trainer-format Kimi K3 checkpoints.
 
-Unlike the frozen M9 research protocol, this module is checkpoint-agnostic.
+Unlike the original pre-registered research evaluation, this module is checkpoint-agnostic.
 It does not load optimizer state or assert a particular model/checkpoint hash.
 """
 from __future__ import annotations

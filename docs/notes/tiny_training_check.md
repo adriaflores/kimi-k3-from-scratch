@@ -120,7 +120,7 @@ PY
 
 Reuse an existing overfit result if its model, recipe, data and logs establish
 these checks. A 2,000-update run is not required again merely to close this
-milestone. If that evidence is missing, start with a 200-update budget:
+check. If that evidence is missing, start with a 200-update budget:
 
 ```bash
 uv run python scripts/train.py \
@@ -140,5 +140,5 @@ execution settings compatible. Validation loss need not improve.
 
 Preserve `run.json`, `metrics.jsonl` and `last.pt` for each run. The
 [monitoring guide](training_monitoring.md) defines the recorded fields and
-checkpoint semantics. This milestone closes the tiny functional circuit;
-candidate-size memory, speed and sustained stability belong to the next test.
+checkpoint semantics. This validates the tiny functional circuit;
+candidate-size memory, speed and sustained stability require separate testing.

@@ -59,7 +59,7 @@ html[data-theme="dark"] .theme-toggle{border-color:var(--rule)}
 /* --------------------------------------------------------------------------
    V3 / SHARED VISUAL CONTRACT
    Neutral near-black, cool-blue accent, restrained typography and no greens.
-   Global styles are owned by the site foundation milestone only.
+   Global styles belong to the shared site foundation.
    -------------------------------------------------------------------------- */
 :root,
 html[data-theme="dark"] {
@@ -246,7 +246,7 @@ html[data-theme="light"] .arch-schematic,html[data-theme="light"] .results-index
 }
 @media(prefers-reduced-motion:reduce){.gateway-card{transition:none}.gateway-card:hover{transform:none}}
 
-/* M1.2: structural chapter rendering. The richer reading/visual system is M1.3. */
+/* Structural chapter rendering and the shared reading/visual system. */
 .chapter-title-link{color:inherit;text-decoration:none}
 .chapter-title-link:hover{color:var(--accent)}
 .empty-chapters{margin:20px clamp(22px,5.2vw,84px) 80px;padding:28px;border:1px solid var(--rule);background:var(--surface-card);color:var(--muted);max-width:810px;line-height:1.75}
@@ -287,7 +287,7 @@ html[data-theme="light"] .arch-schematic,html[data-theme="light"] .results-index
 @media(max-width:500px){.chapter-shell{padding-top:28px;padding-bottom:60px}.chapter-header h1{font-size:46px}.chapter-reading-grid{padding-top:27px}.chapter-footer-nav{gap:15px}.chapter-body{font-size:15px}}
 
 /* --------------------------------------------------------------------------
-   M1.3 / CHAPTER READING SYSTEM
+   CHAPTER READING SYSTEM
    Scope every change to chapters: site-wide v3 gateways remain untouched.
    Chapter HTML patterns are documented in content/READING_STYLE.md.
    -------------------------------------------------------------------------- */
@@ -390,7 +390,7 @@ html[data-theme="dark"] .chapter-body.doc-prose pre.astro-code span { color:var(
  .chapter-toc-link { transition:none; }
 }
 
-/* M1.4 / Figure provenance and compact source trails (chapter-only). */
+/* Figure provenance and compact source trails (chapter-only). */
 .chapter-body.doc-prose .reading-figure { scroll-margin-top:38px; }
 .chapter-body.doc-prose .reading-figure figcaption .figure-provenance { display:block; margin-top:6px; color:var(--muted); font-size:.95em; }
 .chapter-body.doc-prose .reading-figure figcaption a { color:var(--accent); }
@@ -406,7 +406,7 @@ html[data-theme="dark"] .chapter-body.doc-prose pre.astro-code span { color:var(
 }
 
 
-/* M1.5 polish: reading progress belongs to chapter pages, never the site chrome. */
+/* Reading progress belongs to chapter pages, never the site chrome. */
 .chapter-reading-progress {
   position: fixed;
   inset: 0 0 auto;
@@ -459,7 +459,7 @@ html[data-theme="dark"] .chapter-body.doc-prose pre.astro-code span { color:var(
 }
 .chapter-body.doc-prose .reading-question .reading-answer strong { color: var(--ink); }
 
-/* M1.6: allow long headings to wrap inside their established columns.
+/* Allow long headings to wrap inside their established columns.
    No change to the approved alignment or font sizes. */
 .chapter-header h1,
 .chapter-body.doc-prose h2,

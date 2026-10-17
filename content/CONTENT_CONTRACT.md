@@ -1,9 +1,9 @@
-# Kimi K3 website — M1.1 Content and editorial contract
+# Kimi K3 website — Content and editorial contract
 
 **Version:** 1.2 — 16 October 2026  
-**Status:** Design contract; not integrated into GitHub.  
-**Basis:** Kimi K3 site v3 overlay and its roadmap.  
-**Scope:** Architecture and Training chapters. Results use the same evidence principles, but their data manifest is intentionally deferred to M1.4/R1.
+**Status:** Shared editorial conventions.  
+**Basis:** Current Kimi K3 website design and content system.  
+**Scope:** Architecture and Training chapters, with the same evidence principles applied to Results. Numerical claims must rely on verifiable sources.
 
 ## 1. Purpose and boundaries
 
@@ -43,7 +43,7 @@ website/
   src/styles/                 # integration-owned shared styles
 ```
 
-The filenames above are *initial chapter groupings*, not a permanent limit on chapter count. Names use descriptive kebab-case IDs **without numeric prefixes**; `order` determines display sequence. IDs and URLs should remain stable once public. Root `docs/` continues to serve repository-oriented documentation independently. `website/scripts/sync-assets.mjs` already copies root `assets/` to `website/public/assets/`; M1 will reuse it.
+The filenames above are *initial chapter groupings*, not a permanent limit on chapter count. Names use descriptive kebab-case IDs **without numeric prefixes**; `order` determines display sequence. IDs and URLs should remain stable once public. Root `docs/` continues to serve repository-oriented documentation independently. `website/scripts/sync-assets.mjs` copies root `assets/` to `website/public/assets/`.
 
 Routes are `/architecture/<chapter-id>/` and `/training/<chapter-id>/`. The top-level `/architecture/`, `/training/` and `/results/` pages remain the section gateways established by the v3 overlay. The site must not duplicate the chapter inventory in hardcoded arrays once collections are connected.
 
@@ -124,7 +124,7 @@ Explain what we built and why it matters in a short opening paragraph.
 ...
 ```
 
-These headings are a **narrative guide**, not an exact heading-name API. Clear equivalent headings are allowed. Never include a duplicate `# H1` inside Markdown: `title` supplies it. Use `##` for main sections, and `###` for subsections. Contents indexes should be generated from these headings in M1.2/1.3.
+These headings are a **narrative guide**, not an exact heading-name API. Clear equivalent headings are allowed. Never include a duplicate `# H1` inside Markdown: `title` supplies it. Use `##` for main sections, and `###` for subsections. Contents indexes should be generated from these headings by the shared renderer.
 
 ## 4. Editorial voice and pedagogy
 
@@ -213,7 +213,7 @@ These examples calibrate **voice and structure**, not evidence for any specific 
 - **Figures:** store under `assets/site/<collection>/<chapter-id>/`; link via `/assets/site/<collection>/<chapter-id>/<filename>`. Add descriptive alt text and a caption that identifies whether the figure is conceptual, adapted from the paper or experimental. Graphs need axes/units and evidence provenance. The root-assets copying mechanism is already in place.
 - **Interaction and accessibility:** an interactive illustration is an optional enhancement, not a precondition for understanding. Its baseline meaning must survive on touchscreens, without hover, with reduced motion, and without client-side interaction where feasible. Any reusable interactive component belongs to the integration chat, not an individual chapter author.
 
-Use ordinary Markdown links first. Specialized paper/code/evidence citation components should only be added in M1.4 if they materially improve readers' experience; the content must not depend on chapter-specific Astro code.
+Use ordinary Markdown links first. Specialized paper/code/evidence citation components are appropriate only if they materially improve readers' experience; content must not depend on chapter-specific Astro code.
 
 ## 6. Parallel ownership contract
 
@@ -228,24 +228,16 @@ Use ordinary Markdown links first. Specialized paper/code/evidence citation comp
 - `review`: ready for source/technical/editorial validation; not yet public.
 - `published`: integrator accepted the sources, links, maths/figures and copy. Publication is an **editorial decision**, not a claim of formal scientific certification.
 
-M1.2 must specify and implement the dev/production rendering rules for these states. A chapter is publishable when it (a) has a coherent, progressive and inviting story, with length proportional to its ideas, (b) meets metadata validation, (c) clearly distinguishes paper and our implementation, (d) links to appropriate source/tests/evidence, (e) has no unverified quantitative claims, (f) uses figures/equations/examples intentionally and accessibly, and (g) renders and navigates correctly on desktop and mobile.
+The shared renderer defines the development and production behavior of these states. A chapter is publishable when it (a) has a coherent, progressive and inviting story, with length proportional to its ideas, (b) meets metadata validation, (c) clearly distinguishes paper and our implementation, (d) links to appropriate source/tests/evidence, (e) has no unverified quantitative claims, (f) uses figures/equations/examples intentionally and accessibly, and (g) renders and navigates correctly on desktop and mobile.
 
-## 8. M1.1 exit gate and what is deferred
+## 8. Publication and integration boundaries
 
-**M1.1 delivers**: one schema shared by two collections, stable filenames/routes, a unified editorial voice, depth/length/visual guidelines, distinct Architecture/Training narrative standards, reference/evidence principles, and ownership boundaries. This contract is ready for review but is not a tested implementation.
+The chapter schema, routes, editorial voice, accessible reading system and source-verification rules are shared conventions. Architecture and Training chapters follow the same publication checks; editorial review and build verification are required before a chapter is shown publicly. The Results section must not display numerical measurements without matching evidence, provenance and limitations.
 
-**M1.2:** implement Astro collections, filtering, chapter routes and navigation from metadata.  
-**M1.3:** reusable visual reading components.  
-**M1.4:** richer references/figure strategy and Results storage choice.  
-**M1.5:** two representative Markdown chapters and rendered checks.  
-**M1.6:** build, links, responsive QA and reusable handoff.
+## Shared reading patterns
 
-**Integration prerequisite:** apply/reconcile the v3 overlay before treating the `main` branch as the v3 site. As inspected on 16 October 2026, `main` still has `paper-to-code.astro` and `engineering.astro` and no Architecture/Training content collections. Nothing in this contract was committed or deployed.
+The **reading/visual vocabulary** is defined in [`READING_STYLE.md`](READING_STYLE.md). It is mandatory for chapter authors and shared across Architecture and Training: semantic figure/caption markup, Math/KaTeX, code blocks with dual syntax themes, restrained callouts, an optional native self-check, and accessible behavior on desktop and mobile. These are generic Markdown/HTML conventions, not custom Astro pages. The shared figure and source guide defines paper/code/test citations and experimental provenance.
 
-## M1.3 addition — shared reading patterns
+## Citation and figure provenance system
 
-The **reading/visual vocabulary** is defined in [`READING_STYLE.md`](READING_STYLE.md). It is mandatory for chapter authors and shared across Architecture and Training: semantic figure/caption markup, Math/KaTeX, code blocks with dual syntax themes, restrained callouts, an optional native self-check, and accessible behavior on desktop and mobile. These are generic Markdown/HTML conventions, not custom Astro pages. M1.4 still owns final paper/code/test citation patterns and experimental figure provenance.
-
-## M1.4 addition — citation and figure provenance system
-
-See [FIGURES_AND_SOURCES.md](FIGURES_AND_SOURCES.md) for the final M1.4 authoring patterns, evidence requirements, three figure kinds, and the editorial/build checks. The site uses ordinary Markdown links plus semantic figures/source trails rather than adding a new citation syntax or dependencies. Results will use structured JSON evidence records with Markdown narrative **when R1 is implemented**; this milestone does not create unaudited measurements.
+See [FIGURES_AND_SOURCES.md](FIGURES_AND_SOURCES.md) for authoring patterns, evidence requirements, three figure kinds, and editorial/build checks. The site uses ordinary Markdown links plus semantic figures/source trails rather than adding a new citation syntax or dependencies. Results can use audited structured JSON evidence records alongside Markdown interpretation; unverified measurements must not be published.

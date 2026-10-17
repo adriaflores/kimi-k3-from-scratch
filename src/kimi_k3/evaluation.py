@@ -1,6 +1,6 @@
 """Exploratory next-token evaluation over an existing prepared token dataset.
 
-This is NOT the frozen M9 64-window evaluation, and does not reproduce its
+This is NOT the original pre-registered 64-window evaluation, and does not reproduce its
 reported metrics or offer its pre-registered exclusion/identity guarantees.
 """
 from __future__ import annotations
@@ -71,5 +71,5 @@ def evaluate_windows(
         "perplexity_same_tokenizer": math.exp(mean_nll),
         "top1_accuracy": correct / n,
         "precision": precision,
-        "note": "Exploratory evaluation; not the frozen M9 held-out protocol.",
+        "note": "Exploratory evaluation; not the pre-registered held-out protocol.",
     }

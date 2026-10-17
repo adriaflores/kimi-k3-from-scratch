@@ -1,5 +1,5 @@
 /**
- * M1.4: lightweight editorial source/figure checker (no extra dependencies).
+ * Lightweight editorial source/figure checker (no extra dependencies).
  * Human verification of scientific claims, links to external sites and
  * experiment provenance is still required before setting status: published.
  */
@@ -49,7 +49,7 @@ export async function inspectChapter({ chapter, chapterId, text, exists = async 
     if (!caption.replace(/<[^>]+>/g, "").trim()) add(`Figure ${id} needs a meaningful figcaption.`);
     if (status === "published" && !/<strong>Figure \d+[.:]<\/strong>/i.test(caption)) add(`Figure ${id} caption should begin with a numbered Figure label.`);
     const img = body.match(/<img\b([^>]*?)\/?\s*>/i);
-    if (!img) add(`Figure ${id} needs an <img> (M1.4 supports static image figures).`);
+    if (!img) add(`Figure ${id} needs an <img> (only static image figures are supported).`);
     else {
       const src = attr(img[1], "src");
       const alt = attr(img[1], "alt");
@@ -121,6 +121,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     process.stderr.write(`[${level}] ${chapter}: ${message}\n`);
   }
   const errors = findings.filter(finding => finding.level === "error");
-  process.stdout.write(`M1.4 content check: ${errors.length} errors, ${findings.length - errors.length} draft/review warnings.\n`);
+  process.stdout.write(`Content check: ${errors.length} errors, ${findings.length - errors.length} draft/review warnings.\n`);
   if (errors.length) process.exitCode = 1;
 }

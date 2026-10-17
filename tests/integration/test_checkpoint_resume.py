@@ -472,7 +472,7 @@ def test_full_attention_grouping_cannot_resume_per_head_recipe(
 	config = replace(_train_config(), max_steps=1, weight_decay=0.1)
 	architecture = kda_config_factory(num_layers=2, layer_types=("kda", "mla"), num_dense_layers=1)
 	model = KimiK3(architecture)
-	# Reconstruct milestone 2's grouping inside the current container format,
+	# Reconstruct the original grouping inside the current container format,
 	# exercising the layout guard independently of the legacy-format guard.
 	# Fused gate/up stays split; QKV/UQ/UKV are complete attention matrices.
 	assignment = {name: group for group in build_parameter_groups(model, config.weight_decay)

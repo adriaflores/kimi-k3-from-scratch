@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectBuiltSite} from './verify-build.mjs';
 
 async function fixture(fn){
- const root=await mkdtemp(path.join(os.tmpdir(),'kimi-m16-'));
+ const root=await mkdtemp(path.join(os.tmpdir(),'kimi-build-'));
  const put=async (name,text)=>{const p=path.join(root,name);await mkdir(path.dirname(p),{recursive:true});await writeFile(p,text);};
  try{
   await put('website/dist/index.html','<main>home</main>');

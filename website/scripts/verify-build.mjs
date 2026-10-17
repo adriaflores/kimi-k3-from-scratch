@@ -1,5 +1,5 @@
 /**
- * M1.6: verify the *emitted production site*, not just Markdown source.
+ * Verify the *emitted production site*, not just Markdown source.
  * Runs after astro build; uses only Node's standard library.
  * The content schema and editorial figure/source rules are checked elsewhere.
  */
@@ -64,7 +64,7 @@ export async function inspectBuiltSite({root=defaultRoot, dist=path.join(root, '
 
 if(process.argv[1] && fileURLToPath(import.meta.url)===path.resolve(process.argv[1])) {
   const issues=await inspectBuiltSite();
-  for(const issue of issues) process.stderr.write(`M1.6 production QA: ${issue}\n`);
-  process.stdout.write(`M1.6 production QA: ${issues.length ? `${issues.length} issue(s)` : 'PASS (published chapters present, drafts excluded, links/assets checked)'}.\n`);
+  for(const issue of issues) process.stderr.write(`Production QA: ${issue}\n`);
+  process.stdout.write(`Production QA: ${issues.length ? `${issues.length} issue(s)` : 'PASS (published chapters present, drafts excluded, links/assets checked)'}.\n`);
   if (issues.length) process.exitCode=1;
 }

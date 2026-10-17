@@ -1,4 +1,4 @@
-# Kimi K3 website — M1.3 reading and visual style
+# Kimi K3 website — Reading and visual style
 
 **Version:** 1.2 · 16 October 2026  
 **Status:** Integration-owned patterns, prepared for review  
@@ -49,7 +49,7 @@ Plain Markdown does not need a custom Astro component. Use the semantic HTML pat
 </figure>
 ```
 
-Refer to it with `[Figure 1](#fig-example-contrast)`. Figures are **not required** to be links, but opening complex diagrams full size is helpful on phones. Do not rely on color to encode meaning. An experimental plot requires units, provenance and data context, which are governed by M1.4 and R1; the demo figure is explicitly conceptual, not experimental. Do not copy figures from the paper without attribution.
+Refer to it with `[Figure 1](#fig-example-contrast)`. Figures are **not required** to be links, but opening complex diagrams full size is helpful on phones. Do not rely on color to encode meaning. An experimental plot requires units, provenance and data context, described in the shared figure and evidence guide; the demo figure is explicitly conceptual, not experimental. Do not copy figures from the paper without attribution.
 
 ## 4. Three optional reading interventions
 
@@ -116,10 +116,10 @@ The two **draft** chapters are deliberately not finished content:
 - `content/architecture/hybrid-attention.md`: figure, a guided question, a math expression, and a native self-check.
 - `content/training/training-loop.md`: code, data table, note, blockquote, and an illustrative evidence block.
 
-They demonstrate the design system only. No paper-accurate mechanism exposition or quantitative experiment is claimed; M1.5 will replace the fixtures with reviewed chapters. **Never change `status: draft` to `published` merely to make them visible in production.**
+They demonstrate the design system only. No paper-accurate mechanism exposition or quantitative experiment is claimed; They must be revised and reviewed before publication. **Never change `status: draft` to `published` merely to make them visible in production.**
 
 In `website/`, run `npm ci`, `npm run build`, then `npm run dev`; verify both previews in development at `/architecture/hybrid-attention/` and `/training/training-loop/`, dark/light modes, narrow/mobile screens, anchor navigation, scroll behavior, native self-check, code readability, figure zoom and keyboard focus.
 
-## M1.4 addition — verified source and figure patterns
+## Verified source and figure patterns
 
 Figure provenance, stable figure anchors, evidence citations and compact chapter source trails are specified in [FIGURES_AND_SOURCES.md](FIGURES_AND_SOURCES.md). Use that guide instead of inventing per-chapter citation widgets or figure styles. The checker runs before the production Astro build.
