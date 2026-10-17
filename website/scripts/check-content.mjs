@@ -66,6 +66,15 @@ export async function inspectChapter({ chapter, chapterId, text, exists = async 
     }
   }
 
+  // Intuition questions may invite a prediction, but may never abandon the reader.
+  // Accept the answer in the same box, visibly (not hidden behind <details>).
+  for (const [, attrs, body] of text.matchAll(/<aside\b([^>]*)>([\s\S]*?)<\/aside>/gi)) {
+    if (!/\breading-question\b/.test(attr(attrs, "class"))) continue;
+    if (!/<(?:p|div)\b[^>]*class=["'][^"']*\breading-answer\b[^"']*["'][^>]*>[\s\S]*?\S[\s\S]*?<\/(?:p|div)>/i.test(body)) {
+      add("An intuition question needs a visible .reading-answer in the same box.");
+    }
+  }
+
   // Resolve figure links in prose: [Figure 1](#fig-example).
   for (const match of text.matchAll(/\[[^\]]*\]\(#(fig-[a-z0-9-]+)\)/gi)) {
     if (!figureIds.has(match[1])) add(`Broken in-page figure link: #${match[1]}`);

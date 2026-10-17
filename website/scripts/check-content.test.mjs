@@ -48,3 +48,13 @@ test("duplicate figure ids and path traversal are detected", async () => {
   assert.ok(findings.some(f=>f.message.includes("Duplicate figure id")));
   assert.ok(findings.some(f=>f.message.includes("owned asset path")));
 });
+
+test("reader questions require a visible answer", async () => {
+  const question='<aside class="reading-question"><p>Why?</p></aside>';
+  const findings=await inspect(base+figure()+sources+question);
+  assert.ok(findings.some(f=>f.level==='error' && f.message.includes('visible .reading-answer')));
+});
+test("an answered reader question is valid", async () => {
+  const question='<aside class="reading-question"><p>Why?</p><p class="reading-answer">Because the model needs the next target.</p></aside>';
+  assert.deepEqual(await inspect(base+figure()+sources+question),[]);
+});

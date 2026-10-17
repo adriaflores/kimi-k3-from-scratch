@@ -458,3 +458,12 @@ html[data-theme="dark"] .chapter-body.doc-prose pre.astro-code span { color:var(
   color: var(--muted);
 }
 .chapter-body.doc-prose .reading-question .reading-answer strong { color: var(--ink); }
+
+/* M1.6: allow long headings to wrap inside their established columns.
+   No change to the approved alignment or font sizes. */
+.chapter-header h1,
+.chapter-body.doc-prose h2,
+.chapter-body.doc-prose h3 {
+  overflow-wrap:break-word;
+  min-width:0;
+}

@@ -30,3 +30,19 @@ npm run build
 The repo's existing `predev` and `prebuild` hooks sync images from `../assets/`.
 
 See `DEPLOY.md` for Cloudflare Pages steps, and `ROADMAP_AND_CONTRACT.md` for parallel-content workstreams.
+
+## Content development and production QA (M1.6)
+
+The approved editorial references are `../content/architecture/hybrid-attention.md` and `../content/training/training-loop.md`. Their Markdown content is previewable in `npm run dev` and remains **draft-only** in production.
+
+For the chapter ownership contract and publish checklist, read [`../content/AUTHORING_HANDOFF.md`](../content/AUTHORING_HANDOFF.md).
+
+```bash
+cd website
+npm run check:content    # figures, provenance and answered question callouts
+npm run test:content     # Node tests for editorial and production checks
+npm run qa               # tests + asset sync + content check + Astro build + publication audit
+npm run dev              # inspect draft chapters and mobile/dark/light rendering
+```
+
+`npm run verify:build` runs only **after** an Astro build and ensures every published chapter appears in its index and production output while draft/review chapters do not. It also catches missing emitted site figures and broken local anchors in published chapters. Link accuracy, source quality, claims and accessibility still require human review.
