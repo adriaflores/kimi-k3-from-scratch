@@ -1,8 +1,0 @@
-{
-  "host": null,
-  "port": null,
-  "user": "root",
-  "identity_file": null,
-  "remote_root": "/workspace/kimi",
-  "remote_python": "python3"
-}
