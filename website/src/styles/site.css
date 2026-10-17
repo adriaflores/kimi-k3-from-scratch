@@ -404,3 +404,57 @@ html[data-theme="dark"] .chapter-body.doc-prose pre.astro-code span { color:var(
   .chapter-body.doc-prose .reading-sources dl { grid-template-columns:1fr; gap:3px; }
   .chapter-body.doc-prose .reading-sources dd { margin:0 0 12px; }
 }
+
+
+/* M1.5 polish: reading progress belongs to chapter pages, never the site chrome. */
+.chapter-reading-progress {
+  position: fixed;
+  inset: 0 0 auto;
+  height: 3px;
+  z-index: 80;
+  pointer-events: none;
+  background: transparent;
+}
+.chapter-reading-progress-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .chapter-reading-progress-fill { transition: transform 85ms linear; }
+}
+
+/* Secondary reading text should remain comfortable, not microscopic. */
+.chapter-breadcrumb { font-size: 12px; }
+.chapter-header .chapter-eyebrow { font-size: 12px; }
+.chapter-summary { font-size: 15.5px; }
+.chapter-draft { font-size: 12.5px; }
+.chapter-toc-label { font-size: 12px; }
+.chapter-toc-link { font-size: 13.5px; }
+.chapter-toc-subsection { font-size: 12.5px; }
+.chapter-toc-start { font-size: 12.5px; }
+.chapter-body.doc-prose pre code { font-size: 15px; }
+.chapter-body.doc-prose table { font-size: 14.5px; }
+.chapter-body.doc-prose .reading-figure figcaption { font-size: 14px; }
+.chapter-body.doc-prose .reading-note-label { font-size: 12px; letter-spacing: .07em; }
+.chapter-body.doc-prose .reading-note p,
+.chapter-body.doc-prose .reading-evidence p { font-size: 15.5px; }
+.chapter-body.doc-prose .reading-reveal summary,
+.chapter-body.doc-prose .reading-reveal p { font-size: 15px; }
+.chapter-body.doc-prose .reading-sources dt { font-size: 14px; }
+.chapter-body.doc-prose .reading-sources dd { font-size: 14.5px; }
+.chapter-footer-nav a span { font-size: 12.5px; }
+
+/* Reader questions always show the answer, not an unanswered prompt. */
+.chapter-body.doc-prose .reading-question .reading-answer {
+  margin-top: 18px;
+  padding-top: 17px;
+  border-top: 1px solid var(--rule);
+  font: 400 15.5px/1.8 var(--sans);
+  letter-spacing: normal;
+  color: var(--muted);
+}
+.chapter-body.doc-prose .reading-question .reading-answer strong { color: var(--ink); }

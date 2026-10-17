@@ -50,6 +50,7 @@ There's no need to memorize the formula. The logarithm simply turns a confident 
 <aside class="reading-question" aria-label="Check your intuition about next-token targets">
   <span class="reading-note-label">One small trap</span>
   <p>What would happen if we accidentally used the same tokens for both <code>x</code> and <code>y</code>? The loss might go down beautifully, but what skill would the model actually be learning?</p>
+  <p class="reading-answer"><strong>It would learn to copy the answer it has already seen.</strong> A token is part of its own input, so predicting that same token can become an easy shortcut. We might celebrate a tiny loss while the model has learned almost nothing about what comes <em>next</em>. Shifting the targets by one position is what removes that shortcut.</p>
 </aside>
 
 That's why a falling loss, on its own, isn't convincing. We first need to know that we're measuring the right game.

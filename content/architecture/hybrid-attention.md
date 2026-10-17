@@ -38,6 +38,7 @@ For now, ignore forgetting. If the memory predicts a value of 2, but the new inf
 <aside class="reading-question" aria-label="Think about the memory update">
   <span class="reading-note-label">Try this in your head</span>
   <p>What if the memory already predicted 6? Would there be any reason to change that association?</p>
+  <p class="reading-answer"><strong>Not if the retained memory still predicts 6.</strong> Then the prediction error is zero, so there is nothing to correct. Forgetting happens first, though, and may change the answer. That's why the rule checks the memory after decay.</p>
 </aside>
 
 Here's that idea in mathematical form, including KDA's forgetting step:
