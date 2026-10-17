@@ -10,7 +10,7 @@ from pathlib import Path
 
 import torch
 
-from src.kimi_k3.model import KimiK3, KimiK3Config
+from kimi_k3.model import KimiK3, KimiK3Config
 
 
 def resolve_device(name: str) -> torch.device:

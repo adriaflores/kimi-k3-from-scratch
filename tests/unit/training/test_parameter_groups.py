@@ -8,12 +8,12 @@ import pytest
 import torch
 from torch import nn
 
-from src.kimi_k3.ffn.dense_ffn import DenseFFN, SituGLU
-from src.kimi_k3.model import KimiK3, KimiK3Config
-from src.kimi_k3.training.optimizers import MuonAdamW
-from src.kimi_k3.training.parameter_groups import build_parameter_groups
-from src.kimi_k3.training.trainer import TrainConfig, build_optimizer
-from src.kimi_k3.utils import load_config
+from kimi_k3.ffn.dense_ffn import DenseFFN, SituGLU
+from kimi_k3.model import KimiK3, KimiK3Config
+from kimi_k3.training.optimizers import MuonAdamW
+from kimi_k3.training.parameter_groups import build_parameter_groups
+from kimi_k3.training.trainer import TrainConfig, build_optimizer
+from kimi_k3.utils import load_config
 
 
 @pytest.mark.parametrize("full_rank,mla_gate,moe_norm", [(True, True, True), (False, False, False)])

@@ -12,12 +12,12 @@ import pytest
 import torch
 import yaml
 
-from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
-from src.kimi_k3.model import KimiK3
-from src.kimi_k3.training.metrics import MetricsWriter
-from src.kimi_k3.training.profiling import ProfileConfig
-from src.kimi_k3.training.run import start_run
-from src.kimi_k3.training.trainer import (
+from kimi_k3.data import ShardedTokenDataset, TokenDataLoader
+from kimi_k3.model import KimiK3
+from kimi_k3.training.metrics import MetricsWriter
+from kimi_k3.training.profiling import ProfileConfig
+from kimi_k3.training.run import start_run
+from kimi_k3.training.trainer import (
 	TrainConfig,
 	TrainState,
 	_capture_rng_state,

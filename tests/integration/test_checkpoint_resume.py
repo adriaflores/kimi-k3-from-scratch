@@ -16,13 +16,13 @@ import torch.nn.functional as F
 import yaml
 from torch import nn
 
-from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
-from src.kimi_k3.model import KimiK3
-from src.kimi_k3.training.metrics import MetricsWriter
-from src.kimi_k3.training.optimizers import MuonAdamW
-from src.kimi_k3.training.parameter_groups import build_parameter_groups
-from src.kimi_k3.training.run import start_run
-from src.kimi_k3.training.trainer import (
+from kimi_k3.data import ShardedTokenDataset, TokenDataLoader
+from kimi_k3.model import KimiK3
+from kimi_k3.training.metrics import MetricsWriter
+from kimi_k3.training.optimizers import MuonAdamW
+from kimi_k3.training.parameter_groups import build_parameter_groups
+from kimi_k3.training.run import start_run
+from kimi_k3.training.trainer import (
 	TrainConfig,
 	TrainState,
 	build_optimizer,

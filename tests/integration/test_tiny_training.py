@@ -13,10 +13,10 @@ import torch.nn.functional as F
 
 from scripts.summarize_training_run import summarize_run
 from scripts.train import build_model
-from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
-from src.kimi_k3.training.metrics import MetricsWriter
-from src.kimi_k3.training.run import start_run
-from src.kimi_k3.training.trainer import (
+from kimi_k3.data import ShardedTokenDataset, TokenDataLoader
+from kimi_k3.training.metrics import MetricsWriter
+from kimi_k3.training.run import start_run
+from kimi_k3.training.trainer import (
 	TrainConfig,
 	TrainState,
 	build_optimizer,
@@ -24,7 +24,7 @@ from src.kimi_k3.training.trainer import (
 	load_checkpoint,
 	train,
 )
-from src.kimi_k3.utils import load_config
+from kimi_k3.utils import load_config
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODEL_CONFIG = REPO_ROOT / "configs/model/kimi_k3_tiny.yaml"

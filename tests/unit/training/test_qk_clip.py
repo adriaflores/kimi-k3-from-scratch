@@ -8,11 +8,11 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from src.kimi_k3.attention.gated_mla import GatedMLA
-from src.kimi_k3.attention.kda.recurrent import KDARecurrent
-from src.kimi_k3.training.optimizers import MuonAdamW
-from src.kimi_k3.training.parameter_groups import build_parameter_groups
-from src.kimi_k3.training.qk_clip import QKClip, causal_max_logits
+from kimi_k3.attention.gated_mla import GatedMLA
+from kimi_k3.attention.kda.recurrent import KDARecurrent
+from kimi_k3.training.optimizers import MuonAdamW
+from kimi_k3.training.parameter_groups import build_parameter_groups
+from kimi_k3.training.qk_clip import QKClip, causal_max_logits
 
 
 def _score_reference(query, key):

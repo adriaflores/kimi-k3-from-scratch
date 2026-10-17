@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from src.kimi_k3.training.metrics import MetricsWriter, TrainingWindow
-from src.kimi_k3.training.run import RunContext
-from src.kimi_k3.training.trainer import TrainState
+from kimi_k3.training.metrics import MetricsWriter, TrainingWindow
+from kimi_k3.training.run import RunContext
+from kimi_k3.training.trainer import TrainState
 
 
 @pytest.mark.parametrize("tail", [b"", b'{"interrupted":' + b"x" * 5000])

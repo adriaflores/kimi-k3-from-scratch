@@ -4,19 +4,17 @@ import pytest
 import torch
 from torch import nn
 
-from kimi_k3.moe.stable_latent_moe import StableLatentMoE as PackageMoE
-from src.kimi_k3.moe.stable_latent_moe import StableLatentMoE as SourceMoE
-from src.kimi_k3.training.moe_metrics import MoEDiagnostics
+from kimi_k3.moe.stable_latent_moe import StableLatentMoE as SourceMoE
+from kimi_k3.training.moe_metrics import MoEDiagnostics
 
 DEVICES = ["cpu", pytest.param("cuda", marks=pytest.mark.skipif(
 	not torch.cuda.is_available(), reason="CUDA is unavailable"))]
 
 
-@pytest.mark.parametrize("moe_type", [PackageMoE, SourceMoE])
 @pytest.mark.parametrize("device", DEVICES)
-def test_loads_use_actual_biased_top_k_and_exclude_eval(kda_config_factory, moe_type, device):
+def test_loads_use_actual_biased_top_k_and_exclude_eval(kda_config_factory, device):
 	config = kda_config_factory(num_experts=4, num_experts_per_token=2)
-	moe = moe_type(config).to(device)
+	moe = SourceMoE(config).to(device)
 	x = torch.zeros(1, 2, config.hidden_size, device=device)
 	x[..., :4] = torch.tensor([[4.0, 3.0, 0.0, -2.0], [-2.0, 0.0, 3.0, 4.0]], device=device)
 	with torch.no_grad():

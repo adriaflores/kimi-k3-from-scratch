@@ -11,8 +11,8 @@ import torch
 import yaml
 
 from scripts.train import build_model
-from src.kimi_k3.model import KimiK3Config
-from src.kimi_k3.utils import load_config
+from kimi_k3.model import KimiK3Config
+from kimi_k3.utils import load_config
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODEL_CONFIG = REPO_ROOT / "configs/model/kimi_k3_tiny.yaml"

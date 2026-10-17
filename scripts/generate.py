@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.kimi_k3.inference import generate_tokens, load_checkpoint_model, resolve_device
+from kimi_k3.inference import generate_tokens, load_checkpoint_model, resolve_device
 
 
 def parse_args(argv=None):

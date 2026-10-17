@@ -5,9 +5,9 @@ The original M9 frozen protocol is archived in the pre-cleanup-m9 Git tag.
 
 import torch
 
-from src.kimi_k3.inference import generate_tokens, next_token_logits
-from src.kimi_k3.model import KimiK3, KimiK3Config
-from src.kimi_k3.utils import load_config
+from kimi_k3.inference import generate_tokens, next_token_logits
+from kimi_k3.model import KimiK3, KimiK3Config
+from kimi_k3.utils import load_config
 
 
 def test_actual_tiny_kimi_reference_suffix_is_causal():

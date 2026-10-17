@@ -8,8 +8,8 @@ class MoEDiagnostics:
 
 	StableLatentMoE exposes `_expert_load_counts`: None disables collection,
 	a Python list counts routed assignments. Discover that interface rather
-	than a class identity, since this repo supports both src.kimi_k3 and
-	kimi_k3 imports. No tensors, RNG or persistent model state are retained.
+	than a class identity, so wrappers or subclasses remain supported. No tensors, RNG or
+	persistent model state are retained.
 	"""
 
 	def __init__(self, model, *, enabled=True):

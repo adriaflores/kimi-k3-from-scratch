@@ -5,8 +5,8 @@ import copy
 import pytest
 import torch
 
-from src.kimi_k3.training import optimizers
-from src.kimi_k3.training.optimizers import MuonAdamW
+from kimi_k3.training import optimizers
+from kimi_k3.training.optimizers import MuonAdamW
 
 
 CUDA = pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable"))

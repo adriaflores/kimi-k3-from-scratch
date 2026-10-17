@@ -12,9 +12,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.kimi_k3.data.dataset import ShardedTokenDataset
-from src.kimi_k3.evaluation import evaluate_windows
-from src.kimi_k3.inference import load_checkpoint_model, resolve_device
+from kimi_k3.data.dataset import ShardedTokenDataset
+from kimi_k3.evaluation import evaluate_windows
+from kimi_k3.inference import load_checkpoint_model, resolve_device
 
 
 def parse_args(argv=None):

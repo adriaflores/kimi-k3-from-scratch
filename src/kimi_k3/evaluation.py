@@ -10,7 +10,7 @@ import math
 import torch
 import torch.nn.functional as F
 
-from src.kimi_k3.inference import inference_autocast
+from kimi_k3.inference import inference_autocast
 
 
 def evaluate_windows(

@@ -2,10 +2,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from src.kimi_k3.ffn import DenseFFN as Expert
-from src.kimi_k3.ffn import SituGLU
+from kimi_k3.ffn import DenseFFN as Expert
+from kimi_k3.ffn import SituGLU
 
-from src.kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
+from kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
 
 class QuantileBalancer(nn.Module):
 

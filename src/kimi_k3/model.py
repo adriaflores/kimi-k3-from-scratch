@@ -4,18 +4,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.kimi_k3.attention import KDAChunkwise
-from src.kimi_k3.attention import GatedMLA
+from kimi_k3.attention import KDAChunkwise
+from kimi_k3.attention import GatedMLA
 
-from src.kimi_k3.moe import StableLatentMoE
-from src.kimi_k3.ffn import DenseFFN, SituGLU
+from kimi_k3.moe import StableLatentMoE
+from kimi_k3.ffn import DenseFFN, SituGLU
 
-from src.kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
+from kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
 
 def build_kda(config):
 	if config.kda_implementation == "fused":
 		# Imported lazily so CPU-only runs never load fla/Triton.
-		from src.kimi_k3.attention.kda.fused_chunk import FusedKDAChunkwise
+		from kimi_k3.attention.kda.fused_chunk import FusedKDAChunkwise
 		return FusedKDAChunkwise(config)
 	return KDAChunkwise(config)
 

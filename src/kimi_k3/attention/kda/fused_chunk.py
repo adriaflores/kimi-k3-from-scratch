@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from fla.ops.kda import chunk_kda
-from src.kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
+from kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
 
 class FusedKDAChunkwise(nn.Module):
 

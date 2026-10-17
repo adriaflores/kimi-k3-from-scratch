@@ -7,8 +7,8 @@ import yaml
 
 from kimi_k3.model import KimiK3, KimiK3Config
 from kimi_k3.moe.stable_latent_moe import StableLatentMoE
-from src.kimi_k3.training.moe_metrics import MoEDiagnostics
-from src.kimi_k3.utils import load_config
+from kimi_k3.training.moe_metrics import MoEDiagnostics
+from kimi_k3.utils import load_config
 
 CUDA = pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable")
 MODES = [

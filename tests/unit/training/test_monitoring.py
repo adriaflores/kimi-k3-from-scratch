@@ -3,10 +3,10 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from src.kimi_k3.training import monitoring
-from src.kimi_k3.training.metrics import MetricsWriter
-from src.kimi_k3.training.run import RunContext
-from src.kimi_k3.training.trainer import TrainState
+from kimi_k3.training import monitoring
+from kimi_k3.training.metrics import MetricsWriter
+from kimi_k3.training.run import RunContext
+from kimi_k3.training.trainer import TrainState
 
 
 def test_ram_peak_is_explicitly_sampled_and_cpu_gpu_fields_are_null(tmp_path, monkeypatch):

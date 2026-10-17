@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
+from kimi_k3.utils.rmsn import MixedPrecisionRMSNorm
 
 class KDAChunkwise(nn.Module):
 

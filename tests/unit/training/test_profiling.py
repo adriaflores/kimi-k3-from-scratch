@@ -7,12 +7,12 @@ import pytest
 import torch
 from torch import nn
 
-from src.kimi_k3.training.profiling import (
+from kimi_k3.training.profiling import (
 	ProfileConfig,
 	TrainingProfiler,
 	_compress_trace,
 )
-from src.kimi_k3.training.trainer import TrainState
+from kimi_k3.training.trainer import TrainState
 
 
 @pytest.mark.parametrize("values", [

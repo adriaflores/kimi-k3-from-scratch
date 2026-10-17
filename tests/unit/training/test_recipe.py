@@ -5,14 +5,14 @@ import pytest
 import torch
 
 from scripts.train import build_train_config, parse_args
-from src.kimi_k3.model import KimiK3
-from src.kimi_k3.training.trainer import (
+from kimi_k3.model import KimiK3
+from kimi_k3.training.trainer import (
 	TrainConfig,
 	build_optimizer,
 	learning_rate_at_step,
 	validate_precision,
 )
-from src.kimi_k3.utils import load_config
+from kimi_k3.utils import load_config
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 

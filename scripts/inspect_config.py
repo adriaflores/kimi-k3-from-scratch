@@ -30,9 +30,9 @@ import torch.nn as nn
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.kimi_k3.utils import load_config
+from kimi_k3.utils import load_config
 
-from src.kimi_k3.model import KimiK3, KimiK3Config
+from kimi_k3.model import KimiK3, KimiK3Config
 
 
 def parse_args() -> argparse.Namespace:

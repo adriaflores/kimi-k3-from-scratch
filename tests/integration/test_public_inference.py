@@ -4,12 +4,12 @@ from dataclasses import asdict
 import pytest
 import torch
 
-from src.kimi_k3.evaluation import evaluate_windows
-from src.kimi_k3.inference import (
+from kimi_k3.evaluation import evaluate_windows
+from kimi_k3.inference import (
     generate_tokens, load_checkpoint_model, next_token_logits, select_token,
 )
-from src.kimi_k3.model import KimiK3, KimiK3Config
-from src.kimi_k3.utils import load_config
+from kimi_k3.model import KimiK3, KimiK3Config
+from kimi_k3.utils import load_config
 
 
 @pytest.fixture(scope="module")

@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 import torch
 
-from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
-from src.kimi_k3.model import KimiK3
-from src.kimi_k3.training.run import _git_metadata, start_run
-from src.kimi_k3.training.trainer import TrainConfig, TrainState, build_optimizer
+from kimi_k3.data import ShardedTokenDataset, TokenDataLoader
+from kimi_k3.model import KimiK3
+from kimi_k3.training.run import _git_metadata, start_run
+from kimi_k3.training.trainer import TrainConfig, TrainState, build_optimizer
 
 
 @pytest.fixture

@@ -19,12 +19,12 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.kimi_k3.model import KimiK3, KimiK3Config
-from src.kimi_k3.training.optimizers import (
+from kimi_k3.model import KimiK3, KimiK3Config
+from kimi_k3.training.optimizers import (
 	MuonAdamW, _batch_capacity, _compiled_newton_schulz, zeropower_via_newton_schulz,
 )
-from src.kimi_k3.training.parameter_groups import build_parameter_groups
-from src.kimi_k3.utils import load_config
+from kimi_k3.training.parameter_groups import build_parameter_groups
+from kimi_k3.utils import load_config
 
 
 def _blueprint(path):

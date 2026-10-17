@@ -6,10 +6,10 @@ import pytest
 import torch
 from torch import nn
 
-from src.kimi_k3.attention.gated_mla import GatedMLA
-from src.kimi_k3.attention.kda.recurrent import KDARecurrent
-from src.kimi_k3.training.optimizers import MuonAdamW
-from src.kimi_k3.training.parameter_groups import build_parameter_groups
+from kimi_k3.attention.gated_mla import GatedMLA
+from kimi_k3.attention.kda.recurrent import KDARecurrent
+from kimi_k3.training.optimizers import MuonAdamW
+from kimi_k3.training.parameter_groups import build_parameter_groups
 
 
 def _group(model, name, decay=0.2):

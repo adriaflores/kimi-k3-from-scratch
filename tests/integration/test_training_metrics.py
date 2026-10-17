@@ -6,13 +6,13 @@ import pytest
 import torch
 from torch import nn
 
-from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
-from src.kimi_k3.model import KimiK3
-from src.kimi_k3.training import monitoring, trainer
-from src.kimi_k3.training.metrics import MetricsWriter
-from src.kimi_k3.training.profiling import ProfileConfig
-from src.kimi_k3.training.run import start_run
-from src.kimi_k3.training.trainer import TrainConfig, TrainState, train
+from kimi_k3.data import ShardedTokenDataset, TokenDataLoader
+from kimi_k3.model import KimiK3
+from kimi_k3.training import monitoring, trainer
+from kimi_k3.training.metrics import MetricsWriter
+from kimi_k3.training.profiling import ProfileConfig
+from kimi_k3.training.run import start_run
+from kimi_k3.training.trainer import TrainConfig, TrainState, train
 
 
 class QuadraticLoss(nn.Module):

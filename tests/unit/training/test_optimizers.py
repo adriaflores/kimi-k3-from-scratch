@@ -4,7 +4,7 @@ import math
 import pytest
 import torch
 
-from src.kimi_k3.training.optimizers import MuonAdamW, zeropower_via_newton_schulz
+from kimi_k3.training.optimizers import MuonAdamW, zeropower_via_newton_schulz
 
 
 def _parameter(shape, dtype=torch.float64):

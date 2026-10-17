@@ -14,12 +14,12 @@ from torch.nn import functional as F
 
 # Match the model's imports when running the script directly from a checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.kimi_k3.data import ShardedTokenDataset, TokenDataLoader
-from src.kimi_k3.model import KimiK3, KimiK3Config
-from src.kimi_k3.training.metrics import MetricsWriter
-from src.kimi_k3.training.profiling import ProfileConfig
-from src.kimi_k3.training.run import start_run
-from src.kimi_k3.training.trainer import (
+from kimi_k3.data import ShardedTokenDataset, TokenDataLoader
+from kimi_k3.model import KimiK3, KimiK3Config
+from kimi_k3.training.metrics import MetricsWriter
+from kimi_k3.training.profiling import ProfileConfig
+from kimi_k3.training.run import start_run
+from kimi_k3.training.trainer import (
 	TrainConfig,
 	TrainState,
 	build_optimizer,
@@ -27,7 +27,7 @@ from src.kimi_k3.training.trainer import (
 	train,
 	validate_precision,
 )
-from src.kimi_k3.utils import load_config
+from kimi_k3.utils import load_config
 
 
 class SmokeTestLM(nn.Module):

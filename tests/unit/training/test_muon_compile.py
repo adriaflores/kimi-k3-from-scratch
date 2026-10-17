@@ -5,8 +5,8 @@ import copy
 import pytest
 import torch
 
-from src.kimi_k3.training import optimizers
-from src.kimi_k3.training.optimizers import MuonAdamW, zeropower_via_newton_schulz as ns
+from kimi_k3.training import optimizers
+from kimi_k3.training.optimizers import MuonAdamW, zeropower_via_newton_schulz as ns
 
 
 @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float32, torch.float64])
