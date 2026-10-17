@@ -129,9 +129,9 @@ evidence/
 /scripts/profile_followup_results.zip
 /scripts/milestone5/
 
-/website/
-/content/
-/assets/
+# /website/
+# /content/
+# /assets/
 
 # Technical notes moved to the project documentation site
 /docs/

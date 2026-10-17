@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="296" viewBox="0 0 760 296" role="img" aria-labelledby="title desc">
+<title id="title">Scalar forgetting versus channel-wise forgetting</title>
+<desc id="desc">Gated DeltaNet retains 70 percent of both rows in this example. KDA can retain 95 percent of the first key channel and 10 percent of the second. Color indicates retention, not the stored values.</desc>
+<rect x=".5" y=".5" width="759" height="295" rx="5" fill="#fafbfe" stroke="#e0e6f3"/>
+<path d="M380 25v243" stroke="#e0e6f3"/>
+<g font-family="Segoe UI,Arial,sans-serif">
+<text x="28" y="34" font-size="12" letter-spacing="1" fill="#64758e">GATED DELTANET</text><text x="408" y="34" font-size="12" letter-spacing="1" fill="#294bc9">KIMI DELTA ATTENTION</text>
+<text x="28" y="67" font-size="20" fill="#243652">One rate for the whole head</text><text x="408" y="67" font-size="20" fill="#243652">A rate for each key channel</text>
+<text x="28" y="98" font-size="15" fill="#64758e">a = 0.70</text><text x="408" y="98" font-size="15" fill="#64758e">α = (0.95, 0.10)</text>
+<g fill="#7290da"><rect x="62" y="127" width="44" height="35" rx="2"/><rect x="111" y="127" width="44" height="35" rx="2"/><rect x="160" y="127" width="44" height="35" rx="2"/><rect x="209" y="127" width="44" height="35" rx="2"/><rect x="62" y="167" width="44" height="35" rx="2"/><rect x="111" y="167" width="44" height="35" rx="2"/><rect x="160" y="167" width="44" height="35" rx="2"/><rect x="209" y="167" width="44" height="35" rx="2"/></g>
+<g fill="#365dcc"><rect x="442" y="127" width="44" height="35" rx="2"/><rect x="491" y="127" width="44" height="35" rx="2"/><rect x="540" y="127" width="44" height="35" rx="2"/><rect x="589" y="127" width="44" height="35" rx="2"/></g>
+<g fill="#e3e9f9"><rect x="442" y="167" width="44" height="35" rx="2"/><rect x="491" y="167" width="44" height="35" rx="2"/><rect x="540" y="167" width="44" height="35" rx="2"/><rect x="589" y="167" width="44" height="35" rx="2"/></g>
+<g stroke="#8496bd" fill="none" stroke-width="1.3"><path d="M54 122h-6v85h6M261 122h6v85h-6M434 122h-6v85h6M641 122h6v85h-6"/></g>
+<g font-size="15" fill="#64758e"><text x="284" y="150">70%</text><text x="284" y="190">70%</text><text x="664" y="150" fill="#294bc9">95%</text><text x="664" y="190">10%</text></g>
+<text x="28" y="244" font-size="14" fill="#64758e">Both rows forget at the same rate.</text><text x="408" y="244" font-size="14" fill="#64758e">Preserve one direction; reduce another.</text>
+<text x="28" y="274" font-size="12" fill="#79869c">Rows are key channels. Color shows retention, not memory content.</text>
+</g></svg>

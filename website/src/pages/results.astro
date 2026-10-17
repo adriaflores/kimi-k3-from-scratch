@@ -1,0 +1,21 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+const groups = [
+  {id:"architecture", num:"01", title:"Architecture validation", summary:"Component-level numerical equivalence, gradients and decoder integration tests.", anchor:"/architecture/"},
+  {id:"reliability", num:"02", title:"Training & reliability", summary:"Working training circuit, stable updates, checkpoints and deterministic continuation tests.", anchor:"/training/#reliability"},
+  {id:"optimization", num:"03", title:"Optimization studies", summary:"Controlled throughput and memory measurements for fused KDA and the optimizer path.", anchor:"/training/#optimizations"},
+  {id:"scaling", num:"04", title:"Scaling experiments", summary:"Model-proxy experiments, learning-rate/batch studies and their interpretation limits.", anchor:"/training/#scaling"},
+  {id:"qualification", num:"05", title:"Production qualification", summary:"Target GPU checks, throughput, operational safety and recovery evidence.", anchor:"/training/#qualification"},
+  {id:"pretraining", num:"06", title:"Pilot & full pretraining", summary:"The 80M-token pilot, continuation decision and final training/evaluation artifacts.", anchor:"/training/#pretraining"},
+];
+---
+<SiteLayout current="results" title="Results — Kimi K3 from Scratch" description="An evidence index for architecture, training-system studies, optimization, scaling and pretraining evaluation.">
+  <section class="page-intro"><div class="page-kicker">03 / THE EVIDENCE</div><h1>Results across <em>the journey.</em></h1><p>Not only final model scores. This section gathers the evidence supporting each stage of the architecture and training work, with clear methods and limitations.</p></section>
+  <section class="results-index">
+    {groups.map(group => <article class="results-index-card" id={group.id}>
+      <div class="results-card-num">{group.num} / EVIDENCE</div><h2>{group.title}</h2><p>{group.summary}</p><a href={group.anchor}>Related phase ↗</a>
+    </article>)}
+  </section>
+  <section class="result-evidence-block"><div><span class="visual-eyebrow">VERIFIED PILOT EVIDENCE</span><h2>Learning before the full run.</h2><p>The 80,019,456-token pilot recorded a validation-loss reduction from 7.8979 to 4.1003, evaluated repeatedly on the same validation prefix. This supported proceeding to the continuation gate; it does not establish final model generalization.</p><a href="https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/experiments/pilot/scientific_assessment.md" target="_blank" rel="noopener noreferrer">Read scientific decision ↗</a></div><div class="pilot-stats"><span>PILOT VAL LOSS</span><strong>7.8979 <small>→</small> 4.1003</strong><span>Same validation prefix · non-final</span></div></section>
+  <div class="page-endnote">The website is not connected to the training GPU. Detailed plots, reproducible evidence tables and final evaluation summaries will be added only after source verification.</div>
+</SiteLayout>

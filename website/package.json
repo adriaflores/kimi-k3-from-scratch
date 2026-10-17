@@ -1,0 +1,31 @@
+{
+  "name": "website",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "sync-assets": "node scripts/sync-assets.mjs",
+    "check:content": "node scripts/check-content.mjs",
+    "test:content": "node --test scripts/check-content.test.mjs scripts/verify-build.test.mjs",
+    "predev": "npm run sync-assets",
+    "dev": "astro dev",
+    "prebuild": "npm run sync-assets && npm run check:content",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "verify:build": "node scripts/verify-build.mjs",
+    "qa": "npm run test:content && npm run build && npm run verify:build"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "^7.3.1",
+    "astro": "^7.3.3",
+    "katex": "^0.18.7",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0"
+  },
+  "allowScripts": {
+    "esbuild": true
+  }
+}
