@@ -1,6 +1,5 @@
-# M7.5 proposal for M8, preserving M7.3 recipe and optimizer/schedule.
-# Only max_steps and log/eval/checkpoint cadence differ from M7.3.
-# DO NOT launch training until resume probe PASSES and M7.5 GO is issued.
+# Full ~6B-token pretraining recipe continuing the pilot model and optimizer state.
+# Update horizon and reporting cadence differ; core hyperparameters are unchanged.
 batch_size: 32
 seq_len: 1024
 learning_rate: 0.003

@@ -1,15 +1,14 @@
-# M7.5 proposal for M8, preserving M7.3 recipe and optimizer/schedule.
-# Only max_steps and log/eval/checkpoint cadence differ from M7.3.
-# DO NOT launch training until resume probe PASSES and M7.5 GO is issued.
+# Pilot pretraining recipe (~80M tokens); first part of the full learning-rate schedule.
+# 32 x 1024 x 1 = 32768 tokens/update; warmup and decay horizon are global.
 batch_size: 32
 seq_len: 1024
 learning_rate: 0.003
 weight_decay: 0.1
-max_steps: 183106
-log_interval: 64
-eval_interval: 512
+max_steps: 2442
+log_interval: 32
+eval_interval: 128
 eval_batches: 8
-checkpoint_interval: 4096
+checkpoint_interval: 1832
 overfit_batch: false
 gradient_accumulation_steps: 1
 precision: bf16
