@@ -85,6 +85,37 @@ def _dataset_metadata(loader):
 	}
 
 
+def _load_existing_manifest(run_dir, resume_path):
+	"""Validate that a checkpoint belongs to the run being resumed."""
+	manifest_path = run_dir / "run.json"
+	if resume_path is None or not manifest_path.is_file():
+		raise FileExistsError("Run directory already exists; use a new --run-dir or resume its checkpoint")
+	manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+	if (manifest.get("schema_version") != 1 or not manifest.get("run_id")
+			or not isinstance(manifest.get("sessions"), list) or not manifest["sessions"]):
+		raise ValueError("Invalid or unsupported run manifest")
+	if not any(
+		str(resume_path) == session["checkpoint_path"]
+		or (session.get("checkpoint_relative_path") is not None
+			and resume_path == (run_dir / session["checkpoint_relative_path"]).resolve())
+		for session in manifest["sessions"]
+	):
+		raise ValueError("Checkpoint is not associated with this run; choose a new --run-dir")
+	return manifest
+
+
+def _optimizer_metadata(model, optimizer):
+	"""Describe the parameter groups without serializing the tensors."""
+	return {
+		"type": f"{type(optimizer).__module__}.{type(optimizer).__qualname__}",
+		"layout": _optimizer_layout(model, optimizer),
+		"param_groups": [{**{key: value for key, value in group.items() if key != "params"},
+			"parameter_count": len(group["params"]),
+			"element_count": sum(parameter.numel() for parameter in group["params"])}
+						 for group in optimizer.param_groups],
+	}
+
+
 def start_run(*, model, optimizer, config, state, train_loader, val_loader,
 			  repo_root, run_dir=None, resume_path=None, checkpoint_path=None,
 			  runs_root=Path("results/training/runs")) -> RunContext:
@@ -107,19 +138,7 @@ def start_run(*, model, optimizer, config, state, train_loader, val_loader,
 	manifest_path = run_dir / "run.json"
 	manifest = None
 	if run_dir.exists():
-		if resume_path is None or not manifest_path.is_file():
-			raise FileExistsError("Run directory already exists; use a new --run-dir or resume its checkpoint")
-		manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-		if (manifest.get("schema_version") != 1 or not manifest.get("run_id")
-				or not isinstance(manifest.get("sessions"), list) or not manifest["sessions"]):
-			raise ValueError("Invalid or unsupported run manifest")
-		if not any(
-			str(resume_path) == session["checkpoint_path"]
-			or (session.get("checkpoint_relative_path") is not None
-				and resume_path == (run_dir / session["checkpoint_relative_path"]).resolve())
-			for session in manifest["sessions"]
-		):
-			raise ValueError("Checkpoint is not associated with this run; choose a new --run-dir")
+		manifest = _load_existing_manifest(run_dir, resume_path)
 		run_id = manifest["run_id"]
 
 	checkpoint_path = (Path(checkpoint_path).resolve() if checkpoint_path is not None
@@ -136,14 +155,7 @@ def start_run(*, model, optimizer, config, state, train_loader, val_loader,
 		"parameter_count": sum(parameter.numel() for parameter in model.parameters()),
 		"train_config": asdict(config),
 		"qk_clip": qk_clip_metadata(model, threshold=config.qk_clip_threshold, chunk_size=config.qk_clip_chunk_size),
-		"optimizer": {
-			"type": f"{type(optimizer).__module__}.{type(optimizer).__qualname__}",
-			"layout": _optimizer_layout(model, optimizer),
-			"param_groups": [{**{key: value for key, value in group.items() if key != "params"},
-				"parameter_count": len(group["params"]),
-				"element_count": sum(parameter.numel() for parameter in group["params"])}
-							 for group in optimizer.param_groups],
-		},
+		"optimizer": _optimizer_metadata(model, optimizer),
 		"environment": _environment(model),
 		"data": {"train": _dataset_metadata(train_loader), "val": _dataset_metadata(val_loader)},
 		"start_state": {
