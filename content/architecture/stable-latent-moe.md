@@ -31,11 +31,14 @@ Our smaller Kimi K3 configuration has **64 routed experts, of which 2 are select
 >
   <img
     src="/assets/site/architecture/stable-latent-moe/fig-two-paths-one-token.webp"
+    width="1672"
+    height="941"
+    decoding="async"
     alt="Conceptual diagram of Stable LatentMoE showing one token split into a shared path and a sparse routed path through selected latent experts."
     loading="lazy"
   />
   <figcaption>
-    Two paths for the same token. Shared experts always contribute, while the router activates only a few latent experts for the routed path.
+    <strong>Figure 1.</strong> Two paths for the same token. Shared experts always contribute, while the router activates only a few latent experts for the routed path.
   </figcaption>
 </figure>
 
@@ -111,11 +114,14 @@ That's what a **quantile** gives us. Instead of nudging biases a fixed amount ev
 >
   <img
     src="/assets/site/architecture/stable-latent-moe/fig-quantile-threshold-workload-target.webp"
+    width="1672"
+    height="941"
+    decoding="async"
     alt="Conceptual illustration of Quantile Balancing showing how an expert's bias is chosen from token-specific selection thresholds to target a balanced share of routed tokens."
     loading="lazy"
   />
   <figcaption>
-    Quantile Balancing adjusts an expert's selection bias so it receives roughly its target share of tokens, without changing the raw scores used to weight its output.
+    <strong>Figure 2.</strong> Quantile Balancing adjusts an expert's selection bias so it receives roughly its target share of tokens, without changing the raw scores used to weight its output.
   </figcaption>
 </figure>
 
@@ -149,7 +155,7 @@ That leads to a useful distinction about evidence. The [MoE unit tests](https://
 
 We've arrived at a useful division of labor. **Shared experts preserve a reliable full-width path. Routed experts add capacity without making every token pay for all of it. Latent projections make that route manageable, normalization and SiTU keep it better behaved, and QB helps prevent the expert pool from becoming an exclusive club.**
 
-Once we understand this, we can finally put the pieces together. In [Backbone Assembly](/architecture/backbone-assembly/), we'll see how attention, residual mixing, and this MoE layer turn a stream of token representations into a complete language model.
+Once we understand this, we can finally put the pieces together. In the next chapter, **Backbone Assembly**, we'll see how attention, residual mixing, and this MoE layer turn a stream of token representations into a complete language model.
 
 <aside class="reading-sources" aria-label="Sources and verification">
   <span class="reading-note-label">Sources &amp; verification</span>
