@@ -112,17 +112,14 @@ def build_train_config(args):
 	return replace(config, **overrides)
 
 
-def main():
-	args = parse_args()
-	config = build_train_config(args)
-	profile_config = ProfileConfig(args.profile_wait, args.profile_warmup, args.profile_active) if args.profile else None
-	device = torch.device(args.device)
+def _configure_runtime(device, config, deterministic):
+	"""Validate device/precision and seed the process before model construction."""
 	if device.type not in ("cpu", "cuda"):
 		raise ValueError("Choose cpu, cuda, or cuda:<index>")
 	if device.type == "cuda" and not torch.cuda.is_available():
 		raise RuntimeError("CUDA was requested but is unavailable")
 	validate_precision(device, config.precision)
-	if args.deterministic:
+	if deterministic:
 		os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 		torch.use_deterministic_algorithms(True)
 		torch.backends.cudnn.benchmark = False
@@ -130,31 +127,21 @@ def main():
 	random.seed(config.seed)
 	np.random.seed(config.seed)
 	torch.manual_seed(config.seed)
-	train_data = ShardedTokenDataset(args.data_dir, split="train")
-	val_data = ShardedTokenDataset(args.data_dir, split="val")
+
+
+def _build_data_loaders(data_dir, config):
+	"""Use independent train and validation streams from the same corpus."""
+	train_data = ShardedTokenDataset(data_dir, split="train")
+	val_data = ShardedTokenDataset(data_dir, split="val")
 	if train_data.vocab_size != val_data.vocab_size:
 		raise ValueError("Training and validation vocab_size must match")
 	train_loader = TokenDataLoader(train_data, config.batch_size, config.seq_len)
 	val_loader = TokenDataLoader(val_data, config.batch_size, config.seq_len)
-	model = build_model(
-		train_data.vocab_size, config.seq_len,
-		model_config_path=args.model_config, smoke_test=args.smoke_test,
-	).to(device)
-	optimizer = build_optimizer(model, config)
-	state = TrainState()
-	if args.resume:
-		state = load_checkpoint(args.resume, model, optimizer, config,
-								vocab_size=train_data.vocab_size,
-								train_loader=train_loader, val_loader=val_loader)
-		print(f"Resumed step {state.step}; tokens_seen={state.tokens_seen:,}; "
-			  f"base LR={config.learning_rate:g}; saved LR={optimizer.param_groups[0]['lr']:g}. "
-			  f"Data cursor={train_loader.position:,}; RNG restored.")
-	run = start_run(
-		model=model, optimizer=optimizer, config=config, state=state,
-		train_loader=train_loader, val_loader=val_loader,
-		repo_root=Path(__file__).resolve().parents[1], run_dir=args.run_dir,
-		resume_path=args.resume, checkpoint_path=args.checkpoint,
-	)
+	return train_data, train_loader, val_loader
+
+
+def _print_run_summary(args, config, profile_config, device, model, optimizer, state, run):
+	"""Keep CLI diagnostics separate from experiment setup and execution."""
 	print(f"Run: {run.directory} | session: {run.session_id}")
 	print(f"Manifest: {run.directory / 'run.json'} | checkpoint: {run.checkpoint_path}")
 	if profile_config is not None:
@@ -186,6 +173,35 @@ def main():
 		print("SMOKE TEST: toy model only; these are not Kimi K3 results.")
 	else:
 		print(f"KimiK3 | model config: {args.model_config}")
+
+
+def main():
+	args = parse_args()
+	config = build_train_config(args)
+	profile_config = ProfileConfig(args.profile_wait, args.profile_warmup, args.profile_active) if args.profile else None
+	device = torch.device(args.device)
+	_configure_runtime(device, config, args.deterministic)
+	train_data, train_loader, val_loader = _build_data_loaders(args.data_dir, config)
+	model = build_model(
+		train_data.vocab_size, config.seq_len,
+		model_config_path=args.model_config, smoke_test=args.smoke_test,
+	).to(device)
+	optimizer = build_optimizer(model, config)
+	state = TrainState()
+	if args.resume:
+		state = load_checkpoint(args.resume, model, optimizer, config,
+								vocab_size=train_data.vocab_size,
+								train_loader=train_loader, val_loader=val_loader)
+		print(f"Resumed step {state.step}; tokens_seen={state.tokens_seen:,}; "
+			  f"base LR={config.learning_rate:g}; saved LR={optimizer.param_groups[0]['lr']:g}. "
+			  f"Data cursor={train_loader.position:,}; RNG restored.")
+	run = start_run(
+		model=model, optimizer=optimizer, config=config, state=state,
+		train_loader=train_loader, val_loader=val_loader,
+		repo_root=Path(__file__).resolve().parents[1], run_dir=args.run_dir,
+		resume_path=args.resume, checkpoint_path=args.checkpoint,
+	)
+	_print_run_summary(args, config, profile_config, device, model, optimizer, state, run)
 	with MetricsWriter(run) as metrics:
 		print(f"Metrics: {metrics.path}")
 		train(model, optimizer, train_loader, val_loader, config, device,

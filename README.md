@@ -79,7 +79,6 @@ The recorded training recipe is split into an ~80M-token pilot and continuation 
 
 - [Pilot recipe](experiments/pilot/training.yaml)
 - [Full-run continuation recipe](experiments/pretraining/training.yaml)
-- [Pilot scientific assessment](experiments/pilot/scientific_assessment.md)
 
 The scaled run uses BF16, an effective batch of **32 × 1,024 = 32,768 tokens/update**, a **3e-3** peak learning rate, cosine decay, Muon + AdamW, QK-Clip and Quantile Balancing. The full schedule ends at **183,106 optimizer updates**. The continuation recipe expects the original pilot model **and optimizer/training state**, rather than a weights-only restart.
 
@@ -126,13 +125,13 @@ uv run python -m pytest -q tests
 
 The suite covers component behavior, recurrent/chunkwise/fused equivalence, MoE execution, training integration, optimizer geometry, checkpoint recovery, inference causality and CLI behavior. CUDA-specific checks need compatible hardware and dependencies; some tests are skipped when those are absent.
 
-The [pilot assessment](experiments/pilot/scientific_assessment.md) documents a validation-loss reduction from **7.8979 to 4.1003** over 80,019,456 processed tokens. Importantly, those pilot evaluations reused the **same 262,144-token validation prefix**: they demonstrate a training trend, **not** independent held-out generalization. The repository does not bundle original model weights or the complete historical evaluation outputs. No final-model benchmark comparison is claimed here.
+The experiment configurations document the pilot and full-run continuation. The repository does not bundle model weights, complete historical logs, or the original held-out evaluation artifacts. No final-model benchmark comparison is claimed here.
 
 ## Repository layout
 
 ```text
 configs/       Model configurations and bounded training presets
-experiments/   Pilot assessment and pretraining recipes
+experiments/   Pilot and pretraining recipes
 notebooks/     Interactive generation and evaluation playground
 references/    Paper-to-code reading map and required source notices
 scripts/       Data preparation, training, inspection, inference and evaluation

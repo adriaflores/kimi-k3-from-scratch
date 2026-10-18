@@ -439,6 +439,48 @@ def load_checkpoint(path, model, optimizer, config: TrainConfig,
 	return state
 
 
+def _validate_training_setup(model, train_loader, val_loader, config, device, state) -> None:
+	"""Check model, loaders and resume state before updating anything."""
+	if device.type not in ("cpu", "cuda"):
+		raise ValueError("This skeleton supports CPU or one CUDA device")
+	validate_precision(device, config.precision)
+	if config.precision != "fp32" and any(p.dtype != torch.float32 for p in model.parameters()):
+		raise ValueError("Mixed precision requires FP32 model parameters; use autocast, not model.half()")
+	if train_loader is val_loader:
+		raise ValueError("Training and validation require independent loaders")
+	if state.step > config.max_steps:
+		raise ValueError("state.step cannot exceed max_steps")
+	if not config.overfit_batch and state.overfit_batch_start is not None:
+		raise ValueError("A fixed batch state requires overfit_batch=True")
+	if train_loader.dataset.vocab_size != val_loader.dataset.vocab_size:
+		raise ValueError("Training and validation vocab_size must match")
+	for loader in (train_loader, val_loader):
+		if (loader.batch_size, loader.seq_len) != (config.batch_size, config.seq_len):
+			raise ValueError("Loader batch dimensions must match TrainConfig")
+		if loader.dataset.total_tokens < config.batch_size * config.seq_len + 1:
+			raise ValueError("Each split must contain at least one full batch")
+
+
+
+def _get_training_batch(train_loader, device, config, state, fixed_batch):
+	"""Read one batch, restart an exhausted stream, or reuse an overfit batch."""
+	if fixed_batch is None:
+		try:
+			batch_start = train_loader.position
+			x, y = train_loader.next_batch()
+		except StopIteration:
+			train_loader.reset()
+			batch_start = train_loader.position
+			x, y = train_loader.next_batch()
+		x, y = x.to(device), y.to(device)
+		if config.overfit_batch:
+			state.overfit_batch_start = batch_start
+			fixed_batch = (x, y)
+	else:
+		x, y = fixed_batch
+	return (x, y), fixed_batch
+
+
 def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 		  device, *, state: TrainState | None = None, checkpoint_path=None, metrics=None,
 		  profile_config=None, profile_dir=None) -> TrainState:
@@ -461,25 +503,7 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 		config.learning_rate = optimizer.param_groups[0]["lr"]
 		config.__post_init__()
 	device = torch.device(device)
-	if device.type not in ("cpu", "cuda"):
-		raise ValueError("This skeleton supports CPU or one CUDA device")
-	validate_precision(device, config.precision)
-	if config.precision != "fp32" and any(p.dtype != torch.float32 for p in model.parameters()):
-		raise ValueError("Mixed precision requires FP32 model parameters; use autocast, not model.half()")
-	if train_loader is val_loader:
-		raise ValueError("Training and validation require independent loaders")
-	if state.step > config.max_steps:
-		raise ValueError("state.step cannot exceed max_steps")
-	if not config.overfit_batch and state.overfit_batch_start is not None:
-		raise ValueError("A fixed batch state requires overfit_batch=True")
-	if train_loader.dataset.vocab_size != val_loader.dataset.vocab_size:
-		raise ValueError("Training and validation vocab_size must match")
-	for loader in (train_loader, val_loader):
-		if (loader.batch_size, loader.seq_len) != (config.batch_size, config.seq_len):
-			raise ValueError("Loader batch dimensions must match TrainConfig")
-		if loader.dataset.total_tokens < config.batch_size * config.seq_len + 1:
-			raise ValueError("Each split must contain at least one full batch")
-
+	_validate_training_setup(model, train_loader, val_loader, config, device, state)
 	model.train()
 	optimizer.zero_grad(set_to_none=True)
 	scaler = torch.amp.GradScaler(device.type, enabled=config.precision == "fp16")
@@ -514,20 +538,9 @@ def train(model, optimizer, train_loader, val_loader, config: TrainConfig,
 			update_tokens = 0
 			for _ in range(config.gradient_accumulation_steps):
 				with profiling.region("train/data"):
-					if fixed_batch is None:
-						try:
-							batch_start = train_loader.position
-							x, y = train_loader.next_batch()
-						except StopIteration:
-							train_loader.reset()
-							batch_start = train_loader.position
-							x, y = train_loader.next_batch()
-						x, y = x.to(device), y.to(device)
-						if config.overfit_batch:
-							state.overfit_batch_start = batch_start
-							fixed_batch = (x, y)
-					else:
-						x, y = fixed_batch
+					(x, y), fixed_batch = _get_training_batch(
+						train_loader, device, config, state, fixed_batch
+					)
 				with profiling.region("train/forward"):
 					with _autocast(device, config.precision):
 						_, loss = model(x, targets=y)

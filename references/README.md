@@ -117,8 +117,7 @@ specified by **Kimi K3**, rather than attributed to the general MoE works above.
 **Code:** [`prepare_data.py`](../scripts/prepare_data.py),
 [`dataset.py`](../src/kimi_k3/data/dataset.py),
 [`inspect_data.py`](../scripts/inspect_data.py).
-**Evidence:** [`pilot assessment`](../experiments/pilot/scientific_assessment.md),
-[`pilot recipe`](../experiments/pilot/training.yaml),
+**Configurations:** [`pilot recipe`](../experiments/pilot/training.yaml),
 [`full-run recipe`](../experiments/pretraining/training.yaml).
 Dataset-revision IDs, tokenizer-revision IDs, checksums, seed and exact corpus
 counts should be taken from the **run's metadata/checkpoint**, not inferred from
