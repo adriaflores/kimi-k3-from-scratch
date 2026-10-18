@@ -117,6 +117,26 @@ uv run python scripts/evaluate.py \
 
 Generation currently recomputes the prompt without KV/recurrent-state caching; it is intended for correctness and inspection rather than fast serving.
 
+## Results
+
+The scaled Kimi K3 model completed its planned pretraining budget: **6,000,017,408 tokens** across **183,106 optimizer steps**, with 294.7M total parameters (~100.4M active per token).
+
+The final training monitor recorded a training loss of **3.1817** and a validation loss of **3.1825**. These monitoring values are distinct from the standalone evaluation below.
+
+A separate next-token evaluation on **65,536 validation tokens** (64 windows of 1,024 tokens) produced:
+
+| Metric | Result |
+| --- | ---: |
+| Mean negative log-likelihood | 3.0510 nats/token |
+| Perplexity | 21.14 |
+| Top-1 next-token accuracy | 42.27% |
+
+These results describe this specific scaled model and evaluation setup. They are not directly comparable with differently configured evaluations or established language-model benchmarks.
+
+Qualitative generation demonstrates learned language structure, but also reveals limitations, particularly repetition under greedy decoding. The model is a research pretraining artifact, not an instruction-tuned conversational assistant.
+
+The repository provides the implementation, configurations and evaluation tools. Model weights and full historical training artifacts are not distributed.
+
 ## Validation and evidence
 
 ```bash
