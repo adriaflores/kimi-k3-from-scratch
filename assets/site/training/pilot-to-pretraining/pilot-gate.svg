@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 620" width="1440" height="620" role="img" aria-labelledby="title desc">
+  <title id="title">The pilot decision gate</title>
+  <desc id="desc">Stability, accounting and resume signal paths converge in a central gate. The full run starts only to the right of that gate.</desc>
+  <rect width="1440" height="620" fill="#090B10"/>
+  <g font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="47" font-weight="500" fill="#E8EDF4">
+    <text x="105" y="174">Stability</text>
+    <text x="105" y="312">Accounting</text>
+    <text x="105" y="450">Resume</text>
+    <text x="1128" y="335" text-anchor="middle">Full run</text>
+  </g>
+  <g stroke="#596577" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M370 157 H556 Q594 157 594 195 V310 H625"/>
+    <path d="M370 295 H625"/>
+    <path d="M370 433 H556 Q594 433 594 395 V334 H625"/>
+  </g>
+  <g fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M385 157 l24 -17 24 30 24 -24 24 12" stroke="#8FB8FF"/>
+    <path d="M386 295 h100" stroke="#8FB8FF" stroke-dasharray="13 15"/>
+    <path d="M386 433 l30 0 20 -20 20 20 30 0" stroke="#8FB8FF"/>
+  </g>
+  <g fill="#090B10" stroke="#F0BE83" stroke-width="5">
+    <path d="M716 218 L812 311 L716 403 L620 311 Z"/>
+  </g>
+  <text x="716" y="326" text-anchor="middle" font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="42" font-weight="500" fill="#E8EDF4">Gate</text>
+  <path d="M813 311 H994" stroke="#8FB8FF" stroke-width="6" stroke-linecap="round" fill="none"/>
+  <path d="M972 294 L998 311 L972 328" stroke="#8FB8FF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M1301 311 H1363" stroke="#596577" stroke-width="5" stroke-linecap="round" stroke-dasharray="9 16"/>
+  <g fill="#8FB8FF">
+    <circle cx="552" cy="157" r="9"/>
+    <circle cx="552" cy="295" r="9"/>
+    <circle cx="552" cy="433" r="9"/>
+  </g>
+</svg>

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 560" width="1440" height="560" role="img" aria-labelledby="title desc">
+  <title id="title">Three distinct measures of training progress</title>
+  <desc id="desc">Prepared tokens are shown as a corpus of blocks, processed tokens as a stream with a return arrow, and successful updates as tick marks with a skipped attempt crossed out.</desc>
+  <rect width="1440" height="560" fill="#090B10"/>
+  <g font-family="Inter, system-ui, -apple-system, Segoe UI, sans-serif" font-size="43" font-weight="500" fill="#E8EDF4">
+    <text x="80" y="125">Prepared tokens</text>
+    <text x="80" y="292">Processed tokens</text>
+    <text x="80" y="459">Successful updates</text>
+  </g>
+  <g fill="#8FB8FF" opacity=".92">
+    <rect x="600" y="82" width="91" height="68" rx="7"/>
+    <rect x="705" y="82" width="91" height="68" rx="7"/>
+    <rect x="810" y="82" width="91" height="68" rx="7"/>
+    <rect x="915" y="82" width="91" height="68" rx="7"/>
+    <rect x="1020" y="82" width="91" height="68" rx="7"/>
+    <rect x="1125" y="82" width="91" height="68" rx="7"/>
+    <rect x="1230" y="82" width="91" height="68" rx="7"/>
+  </g>
+  <g stroke="#596577" stroke-width="5" fill="none" stroke-linecap="round">
+    <path d="M590 282 H1333"/>
+    <path d="M1271 282 Q1325 282 1325 328 Q1325 367 1266 367 H951"/>
+  </g>
+  <g stroke="#596577" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M976 353 L951 367 L976 381"/>
+  </g>
+  <g fill="#F0BE83">
+    <circle cx="640" cy="282" r="17"/>
+    <circle cx="753" cy="282" r="17"/>
+    <circle cx="866" cy="282" r="17"/>
+    <circle cx="979" cy="282" r="17"/>
+    <circle cx="1092" cy="282" r="17"/>
+    <circle cx="1205" cy="282" r="17"/>
+  </g>
+  <g fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M615 447 l18 18 34 -41" stroke="#8FB8FF"/>
+    <path d="M770 447 l18 18 34 -41" stroke="#8FB8FF"/>
+    <path d="M933 430 l35 35 M968 430 l-35 35" stroke="#F0BE83"/>
+    <path d="M1080 447 l18 18 34 -41" stroke="#8FB8FF"/>
+    <path d="M1235 447 l18 18 34 -41" stroke="#8FB8FF"/>
+  </g>
+</svg>
