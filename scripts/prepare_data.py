@@ -325,6 +325,44 @@ def report_progress(writers: dict, started: float, target: int | None) -> dict:
     }
 
 
+def _replay_source_prefix(source_iterator, visited, read_text, source_digest,
+                          expected_sha256, log_interval):
+    """Replay a checkpointed prefix and verify the original source identity.
+
+    Replayed documents are hashed but never tokenized or written again.
+    """
+    LOG.info("Replaying %s source rows without tokenization; this may take time.", f"{visited:,}")
+    last_replay_log = time.perf_counter()
+    for index in range(visited):
+        try:
+            read_text(next(source_iterator))
+        except StopIteration as exc:
+            raise ValueError("Source ended before the checkpoint position.") from exc
+        if time.perf_counter() - last_replay_log >= log_interval:
+            LOG.info("Replay: %s / %s source rows", f"{index + 1:,}", f"{visited:,}")
+            last_replay_log = time.perf_counter()
+    if source_digest.hexdigest() != expected_sha256:
+        raise ValueError("Source order/content differs from the checkpoint; refusing to resume.")
+
+
+def _write_token_batch(texts, tokenizer, writers, seed, val_fraction, train_tokens):
+    """Encode a source batch in document order, including one EOS per document.
+
+    Stop after the document that reaches the training target; earlier
+    prefetching can leave unwritten documents in the source iterator.
+    """
+    encoded = tokenizer(
+        texts, add_special_tokens=False, padding=False, truncation=False,
+        return_attention_mask=False, return_token_type_ids=False, verbose=False,
+    )["input_ids"]
+    for text, tokens in zip(texts, encoded, strict=True):
+        split = split_for(text, seed, val_fraction)
+        tokens.append(tokenizer.eos_token_id)
+        writers[split].append(tokens)
+        if train_tokens is not None and writers["train"].tokens >= train_tokens:
+            break
+
+
 def prepare(args: argparse.Namespace) -> dict:
     output = args.output_dir.resolve()
     staging = output.with_name(output.name + ".incomplete")
@@ -415,18 +453,10 @@ def prepare(args: argparse.Namespace) -> dict:
             # Replay reconstructs the bounded shuffle from the stored file order,
             # without re-tokenizing or rewriting the committed prefix.
             if saved:
-                LOG.info("Replaying %s source rows without tokenization; this may take time.", f"{visited:,}")
-                last_replay_log = time.perf_counter()
-                for index in range(visited):
-                    try:
-                        read_text(next(source_iterator))
-                    except StopIteration as exc:
-                        raise ValueError("Source ended before the checkpoint position.") from exc
-                    if time.perf_counter() - last_replay_log >= args.log_interval:
-                        LOG.info("Replay: %s / %s source rows", f"{index + 1:,}", f"{visited:,}")
-                        last_replay_log = time.perf_counter()
-                if source_digest.hexdigest() != saved["source_prefix_sha256"]:
-                    raise ValueError("Source order/content differs from the checkpoint; refusing to resume.")
+                _replay_source_prefix(
+                    source_iterator, visited, read_text, source_digest,
+                    saved["source_prefix_sha256"], args.log_interval,
+                )
             last_report = last_checkpoint = time.perf_counter()
 
             def nonempty_texts():
@@ -442,16 +472,9 @@ def prepare(args: argparse.Namespace) -> dict:
             text_iterator = nonempty_texts()
             while texts := list(islice(text_iterator, args.tokenization_batch_size)):
                 # Preserve document order and full lengths; training builds blocks later.
-                encoded = tokenizer(
-                    texts, add_special_tokens=False, padding=False, truncation=False,
-                    return_attention_mask=False, return_token_type_ids=False, verbose=False,
-                )["input_ids"]
-                for text, tokens in zip(texts, encoded, strict=True):
-                    split = split_for(text, args.seed, args.val_fraction)
-                    tokens.append(tokenizer.eos_token_id)
-                    writers[split].append(tokens)
-                    if args.train_tokens is not None and writers["train"].tokens >= args.train_tokens:
-                        break
+                _write_token_batch(
+                    texts, tokenizer, writers, args.seed, args.val_fraction, args.train_tokens,
+                )
                 if time.perf_counter() - last_report >= args.log_interval:
                     report_progress(writers, started, args.train_tokens)
                     last_report = time.perf_counter()
