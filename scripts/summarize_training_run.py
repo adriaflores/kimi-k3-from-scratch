@@ -17,6 +17,47 @@ def _finite(value, name, *, minimum=0):
 	return value
 
 
+def _session_records(directory: Path, session_id: str, run_id: str):
+	"""Yield only records from this session, rejecting torn tails and wrong run IDs."""
+	with (directory / "metrics.jsonl").open(encoding="utf-8") as stream:
+		for line_number, line in enumerate(stream, 1):
+			if not line.endswith("\n"):
+				raise ValueError(f"Uncommitted metrics tail at line {line_number}")
+			record = json.loads(line)
+			if record["session_id"] != session_id:
+				continue
+			if record["run_id"] != run_id:
+				raise ValueError("Metric run identity differs from the manifest")
+			yield record
+
+
+def _validate_train_window(record: dict, config: dict, expected_step: int) -> None:
+	"""Check logged counters and scalar invariants before aggregating a window."""
+	_finite(record["train_loss"], "training loss")
+	_finite(record["lr"], "learning rate")
+	_finite(record["grad_norm_mean"], "gradient norm mean")
+	_finite(record["grad_norm_max"], "gradient norm maximum")
+	count, skipped = record["updates"], record["skipped_updates_in_window"]
+	if count < 1 or skipped < 0 or record["attempted_updates"] != count + skipped:
+		raise ValueError("Inconsistent update counts in training window")
+	if record["step"] != expected_step + count:
+		raise ValueError("Discontinuous successful-update history")
+	attempt_tokens = config["batch_size"] * config["seq_len"] * config["gradient_accumulation_steps"]
+	if record["tokens"] != attempt_tokens * record["attempted_updates"]:
+		raise ValueError("Token count differs from the configured microbatches")
+	clip = record["qk_clip"]
+	if clip["threshold"] != config["qk_clip_threshold"]:
+		raise ValueError("QK-Clip threshold differs from the session recipe")
+	observed, clipped = clip["observed_head_updates"], clip["clipped_head_updates"]
+	if not 0 <= clipped <= observed:
+		raise ValueError("Invalid QK-Clip head-update counts")
+	if clip["max_logit"] is not None:
+		_finite(clip["max_logit"], "maximum logit", minimum=-math.inf)
+	fraction = _finite(record["clipped_fraction"], "gradient clipping fraction")
+	if fraction > 1:
+		raise ValueError("Gradient clipping fraction exceeds one")
+
+
 def summarize_run(directory, *, after_step=0, expected_step=None):
 	"""Latest session only; steady rates include whole windows after after_step.
 
@@ -38,65 +79,43 @@ def summarize_run(directory, *, after_step=0, expected_step=None):
 	steady_seconds = clipped_updates = 0.0
 	last = end = None
 	memory = dict.fromkeys(("ram_rss_sampled_peak_bytes", "cuda_peak_allocated_bytes", "cuda_peak_reserved_bytes"))
-	with (directory / "metrics.jsonl").open(encoding="utf-8") as stream:
-		for line_number, line in enumerate(stream, 1):
-			if not line.endswith("\n"):
-				raise ValueError(f"Uncommitted metrics tail at line {line_number}")
-			record = json.loads(line)
-			if record["session_id"] != session["session_id"]:
-				continue
-			if record["run_id"] != manifest["run_id"]:
-				raise ValueError("Metric run identity differs from the manifest")
-			last = record
-			for name in memory:
-				value = record.get("memory", {}).get(name)
-				if value is not None:
-					memory[name] = max(memory[name] or 0, _finite(value, name))
-			if record["event"] == "session_end":
-				end = record
-			if record["event"] == "val":
-				_finite(record["val_loss"], "validation loss")
-			if record["event"] != "train":
-				continue
-			loss = _finite(record["train_loss"], "training loss")
-			_finite(record["lr"], "learning rate")
-			_finite(record["grad_norm_mean"], "gradient norm mean")
-			grad_max = max(grad_max or 0, _finite(record["grad_norm_max"], "gradient norm maximum"))
-			if first_loss is None:
-				first_loss = loss
-			last_loss = loss
-			count, skipped = record["updates"], record["skipped_updates_in_window"]
-			if count < 1 or skipped < 0 or record["attempted_updates"] != count + skipped:
-				raise ValueError("Inconsistent update counts in training window")
-			if record["step"] != start["step"] + updates + count:
-				raise ValueError("Discontinuous successful-update history")
-			attempt_tokens = config["batch_size"] * config["seq_len"] * config["gradient_accumulation_steps"]
-			if record["tokens"] != attempt_tokens * record["attempted_updates"]:
-				raise ValueError("Token count differs from the configured microbatches")
-			clip = record["qk_clip"]
-			if clip["threshold"] != config["qk_clip_threshold"]:
-				raise ValueError("QK-Clip threshold differs from the session recipe")
-			observed, clipped = clip["observed_head_updates"], clip["clipped_head_updates"]
-			if not 0 <= clipped <= observed:
-				raise ValueError("Invalid QK-Clip head-update counts")
-			if clip["max_logit"] is not None:
-				value = _finite(clip["max_logit"], "maximum logit", minimum=-math.inf)
-				max_logit = value if max_logit is None else max(max_logit, value)
-			clipped_heads += clipped
-			observed_heads += observed
-			updates += count
-			tokens += record["tokens"]
-			skips += skipped
-			nonfinite += record["nonfinite_grad_norms"]
-			fraction = _finite(record["clipped_fraction"], "gradient clipping fraction")
-			if fraction > 1:
-				raise ValueError("Gradient clipping fraction exceeds one")
-			clipped_updates += fraction * count
-			windows += 1
-			# Exclude a straddling window in full, rather than mixing warmup in.
-			if record["step"] - count >= after_step:
-				steady_tokens += record["tokens"]
-				steady_seconds += _finite(record["train_seconds"], "training seconds")
+	for record in _session_records(directory, session["session_id"], manifest["run_id"]):
+		last = record
+		for name in memory:
+			value = record.get("memory", {}).get(name)
+			if value is not None:
+				memory[name] = max(memory[name] or 0, _finite(value, name))
+		if record["event"] == "session_end":
+			end = record
+		if record["event"] == "val":
+			_finite(record["val_loss"], "validation loss")
+		if record["event"] != "train":
+			continue
+		_validate_train_window(record, config, start["step"] + updates)
+		loss = record["train_loss"]
+		grad_max = max(grad_max or 0, record["grad_norm_max"])
+		if first_loss is None:
+			first_loss = loss
+		last_loss = loss
+		count, skipped = record["updates"], record["skipped_updates_in_window"]
+		clip = record["qk_clip"]
+		observed, clipped = clip["observed_head_updates"], clip["clipped_head_updates"]
+		if clip["max_logit"] is not None:
+			value = clip["max_logit"]
+			max_logit = value if max_logit is None else max(max_logit, value)
+		clipped_heads += clipped
+		observed_heads += observed
+		updates += count
+		tokens += record["tokens"]
+		skips += skipped
+		nonfinite += record["nonfinite_grad_norms"]
+		fraction = record["clipped_fraction"]
+		clipped_updates += fraction * count
+		windows += 1
+		# Exclude a straddling window in full, rather than mixing warmup in.
+		if record["step"] - count >= after_step:
+			steady_tokens += record["tokens"]
+			steady_seconds += _finite(record["train_seconds"], "training seconds")
 	if not windows:
 		raise ValueError("No logged training windows for the latest session")
 	if end is not None and (updates != end["step"] - start["step"]
