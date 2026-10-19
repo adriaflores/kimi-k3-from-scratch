@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@astrojs/markdown-remark": "^7.3.1",
+    "@astrojs/sitemap": "^3.7.4",
     "astro": "^7.3.3",
     "katex": "^0.18.7",
     "rehype-katex": "^7.0.1",
@@ -28,5 +29,8 @@
   },
   "allowScripts": {
     "esbuild": true
+  },
+  "overrides": {
+    "katex": "$katex"
   }
 }

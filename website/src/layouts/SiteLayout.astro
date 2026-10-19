@@ -16,6 +16,10 @@ const links = [
   { href: "/docs/", label: "Docs", id: "docs" },
 ];
 const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://kimi-k3.adriaflores.com/").toString();
+const ogImage = new URL(
+  "/kimi-k3-open-graph.png",
+  Astro.site ?? "https://kimi-k3.adriaflores.com/"
+).toString();
 ---
 <!doctype html>
 <html lang="en" data-theme="dark">
@@ -38,6 +42,18 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://kimi-k3.adr
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Kimi K3 from Scratch — a 13-layer hybrid language model."
+    />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
