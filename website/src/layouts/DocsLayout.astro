@@ -1,0 +1,33 @@
+---
+import SiteLayout from "./SiteLayout.astro";
+import { sourceHref } from "../data/docs-files";
+import "../styles/docs.css";
+interface Heading { depth: number; slug: string; text: string }
+interface Props { title: string; description: string; sourcePath: string; status: "draft" | "review" | "published"; headings: Heading[] }
+const { title, description, sourcePath, status, headings } = Astro.props;
+const toc = headings.filter(h => h.depth === 2 || h.depth === 3);
+const editorialPreview = import.meta.env.DEV && status !== "published";
+---
+<SiteLayout title={`${title} — Docs — Kimi K3 from Scratch`} description={description} current="docs">
+  <div class="chapter-shell">
+    <nav class="chapter-breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/docs/">Docs</a><span aria-hidden="true">/</span><span aria-current="page">{sourcePath}</span></nav>
+    <header class="chapter-header" id="chapter-start">
+      <div class="chapter-eyebrow">DOCS / SOURCE REFERENCE</div>
+      <h1>{title}</h1>
+      <p class="chapter-summary">{description}</p>
+      <p class="docs-source-path"><code>{sourcePath}</code> · <a href={sourceHref(sourcePath)} target="_blank" rel="noopener noreferrer">View pinned source ↗</a></p>
+      {editorialPreview && <p class="chapter-draft" role="status">Editorial preview · {status}. Not included in the production site.</p>}
+    </header>
+    <div class="chapter-reading-grid">
+      {toc.length > 0 && <aside class="chapter-toc" aria-label="On this page">
+        <div class="chapter-toc-label">IN THIS FILE</div>
+        <nav aria-label="Documentation sections">
+          {toc.map(h => <a class:list={["chapter-toc-link", { "chapter-toc-subsection": h.depth === 3 }]} href={`#${h.slug}`}>{h.text}</a>)}
+        </nav>
+        <a class="chapter-toc-start" href="#chapter-start">↑ Back to beginning</a>
+      </aside>}
+      <article class="chapter-body doc-prose" aria-label={`${title} implementation reference`}><slot /></article>
+    </div>
+    <nav class="docs-back" aria-label="Documentation navigation"><a href="/docs/">← Back to source explorer</a></nav>
+  </div>
+</SiteLayout>

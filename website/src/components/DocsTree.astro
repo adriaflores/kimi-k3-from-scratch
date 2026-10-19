@@ -1,0 +1,33 @@
+---
+import { docHref, sourceHref } from "../data/docs-files";
+import type { TreeNode } from "../lib/docs";
+interface Props { nodes: TreeNode[]; visiblePaths: string[]; depth?: number }
+const { nodes, visiblePaths, depth = 0 } = Astro.props;
+const visible = new Set(visiblePaths);
+function countFiles(node: TreeNode): number {
+  return node.description ? 1 : node.children.reduce((n, child) => n + countFiles(child), 0);
+}
+---
+<ul class:list={["docs-tree-list", { "docs-tree-top": depth === 0 }]}>
+  {nodes.map(node => <li>
+    {node.description === undefined ? (
+      <details class="docs-folder" open={depth < 2}>
+        <summary><span class="docs-folder-name">{node.name}/</span><span class="docs-folder-count">{countFiles(node)} files</span></summary>
+        <Astro.self nodes={node.children} visiblePaths={visiblePaths} depth={depth + 1} />
+      </details>
+    ) : (
+      <div class="docs-file">
+        <span class="docs-file-main">
+          {visible.has(node.fullPath)
+            ? <a class="docs-file-title" href={docHref(node.fullPath)}>{node.name}</a>
+            : <span class="docs-file-pending">{node.name}</span>}
+          <span class="docs-file-description">{node.description}</span>
+        </span>
+        <span class="docs-file-actions">
+          {!visible.has(node.fullPath) && <span class="docs-pending-label">In preparation</span>}
+          <a href={sourceHref(node.fullPath)} target="_blank" rel="noopener noreferrer" aria-label={`View ${node.fullPath} source on GitHub`}>Source ↗</a>
+        </span>
+      </div>
+    )}
+  </li>)}
+</ul>

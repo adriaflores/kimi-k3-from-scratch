@@ -1,0 +1,154 @@
+{
+  "sourceCommit": "10c0dcfa8d2b0415f8866674effd82b7548772e7",
+  "repository": "adriaflores/kimi-k3-from-scratch",
+  "files": [
+    {
+      "sourcePath": "src/kimi_k3/__init__.py",
+      "description": "Package root; no public symbols defined here."
+    },
+    {
+      "sourcePath": "src/kimi_k3/model.py",
+      "description": "Decoder backbone, AttnRes, configuration, and language-model forward pass."
+    },
+    {
+      "sourcePath": "src/kimi_k3/evaluation.py",
+      "description": "Evaluation logic and metrics interfaces."
+    },
+    {
+      "sourcePath": "src/kimi_k3/inference.py",
+      "description": "Token generation and inference routines."
+    },
+    {
+      "sourcePath": "src/kimi_k3/attention/__init__.py",
+      "description": "Attention package exports."
+    },
+    {
+      "sourcePath": "src/kimi_k3/attention/gated_mla.py",
+      "description": "Gated multi-head latent attention."
+    },
+    {
+      "sourcePath": "src/kimi_k3/attention/kda/recurrent.py",
+      "description": "Tokenwise KDA reference implementation."
+    },
+    {
+      "sourcePath": "src/kimi_k3/attention/kda/chunkwise.py",
+      "description": "Chunkwise KDA with triangular transformation and recurrent state."
+    },
+    {
+      "sourcePath": "src/kimi_k3/attention/kda/fused_chunk.py",
+      "description": "FLA-backed fused KDA integration."
+    },
+    {
+      "sourcePath": "src/kimi_k3/data/__init__.py",
+      "description": "Public data-loader exports."
+    },
+    {
+      "sourcePath": "src/kimi_k3/data/dataset.py",
+      "description": "Prepared token shards and streaming causal batches."
+    },
+    {
+      "sourcePath": "src/kimi_k3/ffn/__init__.py",
+      "description": "Feed-forward module exports."
+    },
+    {
+      "sourcePath": "src/kimi_k3/ffn/dense_ffn.py",
+      "description": "Dense FFN and SiTU-GLU activation."
+    },
+    {
+      "sourcePath": "src/kimi_k3/moe/__init__.py",
+      "description": "Mixture-of-experts package export."
+    },
+    {
+      "sourcePath": "src/kimi_k3/moe/stable_latent_moe.py",
+      "description": "Stable LatentMoE routing, expert execution, and balancing."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/__init__.py",
+      "description": "Minimal training package interface."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/trainer.py",
+      "description": "Training steps, precision, gradients, and checkpoint handling."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/run.py",
+      "description": "Run lifecycle and artifact organization."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/optimizers.py",
+      "description": "Muon and AdamW optimization implementations."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/parameter_groups.py",
+      "description": "Assignment of parameters to optimizer groups."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/qk_clip.py",
+      "description": "QK clipping utilities."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/metrics.py",
+      "description": "Metrics logging and records."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/moe_metrics.py",
+      "description": "MoE monitoring metrics."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/monitoring.py",
+      "description": "Training diagnostics and monitoring."
+    },
+    {
+      "sourcePath": "src/kimi_k3/training/profiling.py",
+      "description": "Runtime and memory profiling support."
+    },
+    {
+      "sourcePath": "src/kimi_k3/utils/__init__.py",
+      "description": "Utility package exports."
+    },
+    {
+      "sourcePath": "src/kimi_k3/utils/config.py",
+      "description": "Configuration loading utilities."
+    },
+    {
+      "sourcePath": "src/kimi_k3/utils/rmsn.py",
+      "description": "Mixed-precision RMSNorm."
+    },
+    {
+      "sourcePath": "scripts/train.py",
+      "description": "Training command and CLI orchestration."
+    },
+    {
+      "sourcePath": "scripts/evaluate.py",
+      "description": "Evaluation entry point."
+    },
+    {
+      "sourcePath": "scripts/generate.py",
+      "description": "Text generation entry point."
+    },
+    {
+      "sourcePath": "scripts/prepare_data.py",
+      "description": "Corpus preparation pipeline."
+    },
+    {
+      "sourcePath": "scripts/inspect_data.py",
+      "description": "Inspect prepared dataset artifacts."
+    },
+    {
+      "sourcePath": "scripts/inspect_config.py",
+      "description": "Inspect resolved model configuration."
+    },
+    {
+      "sourcePath": "scripts/summarize_training_run.py",
+      "description": "Summarize training-run evidence."
+    },
+    {
+      "sourcePath": "scripts/bench_muon.py",
+      "description": "Muon benchmarking utility."
+    },
+    {
+      "sourcePath": "scripts/convert_assets_to_webp.py",
+      "description": "Website asset conversion and Markdown-link maintenance."
+    }
+  ]
+}

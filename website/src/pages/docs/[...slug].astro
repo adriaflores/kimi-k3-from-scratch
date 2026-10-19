@@ -1,5 +1,16 @@
 ---
-// File-by-file reference pages are intentionally not generated yet.
-// Restore a Markdown-backed getStaticPaths() when file-level documentation is published.
-export function getStaticPaths() { return []; }
+import { render } from "astro:content";
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { getDocsEntries } from "../../lib/docs";
+import { docId } from "../../data/docs-files";
+
+export async function getStaticPaths() {
+  const pages = await getDocsEntries();
+  return pages.map(entry => ({ params: { slug: docId(entry.data.sourcePath) }, props: { entry } }));
+}
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
 ---
+<DocsLayout title={entry.data.title} description={entry.data.description} sourcePath={entry.data.sourcePath} status={entry.data.status} headings={headings}>
+  <Content />
+</DocsLayout>

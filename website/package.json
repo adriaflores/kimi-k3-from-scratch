@@ -8,10 +8,11 @@
   "scripts": {
     "sync-assets": "node scripts/sync-assets.mjs",
     "check:content": "node scripts/check-content.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
     "test:content": "node --test scripts/check-content.test.mjs scripts/verify-build.test.mjs",
     "predev": "npm run sync-assets",
     "dev": "astro dev",
-    "prebuild": "npm run sync-assets && npm run check:content",
+    "prebuild": "npm run sync-assets && npm run check:content && npm run check:docs",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",

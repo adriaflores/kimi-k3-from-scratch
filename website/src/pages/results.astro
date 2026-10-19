@@ -1,21 +1,275 @@
 ---
 import SiteLayout from "../layouts/SiteLayout.astro";
-const groups = [
-  {id:"architecture", num:"01", title:"Architecture validation", summary:"Component-level numerical equivalence, gradients and decoder integration tests.", anchor:"/architecture/"},
-  {id:"reliability", num:"02", title:"Training & reliability", summary:"Working training circuit, stable updates, checkpoints and deterministic continuation tests.", anchor:"/training/#reliability"},
-  {id:"optimization", num:"03", title:"Optimization studies", summary:"Controlled throughput and memory measurements for fused KDA and the optimizer path.", anchor:"/training/#optimizations"},
-  {id:"scaling", num:"04", title:"Scaling experiments", summary:"Model-proxy experiments, learning-rate/batch studies and their interpretation limits.", anchor:"/training/#scaling"},
-  {id:"qualification", num:"05", title:"Production qualification", summary:"Target GPU checks, throughput, operational safety and recovery evidence.", anchor:"/training/#qualification"},
-  {id:"pretraining", num:"06", title:"Pilot & full pretraining", summary:"The 80M-token pilot, continuation decision and final training/evaluation artifacts.", anchor:"/training/#pretraining"},
-];
+
+// Results is intentionally one editorial page, not a mirror of Training's phases.
+// Figures and numerical claims come from the independently reviewed training and evaluation evidence.
+const evidence = "/assets/site/results/verified-evidence.zip";
+const trainingPlot = "/assets/site/results/training-monitoring.png";
+const repetitionPlot = "/assets/site/results/repeated-trigrams.png";
 ---
-<SiteLayout current="results" title="Results — Kimi K3 from Scratch" description="An evidence index for architecture, training-system studies, optimization, scaling and pretraining evaluation.">
-  <section class="page-intro"><div class="page-kicker">03 / THE EVIDENCE</div><h1>Results across <em>the journey.</em></h1><p>Not only final model scores. This section gathers the evidence supporting each stage of the architecture and training work, with clear methods and limitations.</p></section>
-  <section class="results-index">
-    {groups.map(group => <article class="results-index-card" id={group.id}>
-      <div class="results-card-num">{group.num} / EVIDENCE</div><h2>{group.title}</h2><p>{group.summary}</p><a href={group.anchor}>Related phase ↗</a>
-    </article>)}
-  </section>
-  <section class="result-evidence-block"><div><span class="visual-eyebrow">VERIFIED PILOT EVIDENCE</span><h2>Learning before the full run.</h2><p>The 80,019,456-token pilot recorded a validation-loss reduction from 7.8979 to 4.1003, evaluated repeatedly on the same validation prefix. This supported proceeding to the continuation gate; it does not establish final model generalization.</p><a href="https://github.com/adriaflores/kimi-k3-from-scratch/blob/main/experiments/pilot/scientific_assessment.md" target="_blank" rel="noopener noreferrer">Read scientific decision ↗</a></div><div class="pilot-stats"><span>PILOT VAL LOSS</span><strong>7.8979 <small>→</small> 4.1003</strong><span>Same validation prefix · non-final</span></div></section>
-  <div class="page-endnote">The website is not connected to the training GPU. Detailed plots, reproducible evidence tables and final evaluation summaries will be added only after source verification.</div>
+<SiteLayout
+  current="results"
+  title="Results — Kimi K3 from Scratch"
+  description="What a 295M-parameter Kimi K3-style backbone learned after 6B processed tokens: verified training, independent next-token evaluation, and unedited generations."
+>
+  <div class="results-story">
+    <header class="page-intro results-lead" id="experiment">
+      <div class="page-kicker">03 / THE EVIDENCE</div>
+      <h1>Six billion tokens.<br /><em>What did we learn?</em></h1>
+      <p>
+        Building a language model is one question. Training it all the way to the planned
+        budget is another. But the most interesting question comes afterward:
+        <strong>what can the finished model actually do?</strong> Here is what the
+        measurements, training logs, and the model's own words tell us.
+      </p>
+      <div class="results-lead-meta">KIMI K3–STYLE LANGUAGE BACKBONE <span aria-hidden="true">·</span> FROZEN FINAL CHECKPOINT <span aria-hidden="true">·</span> OCTOBER 2026</div>
+    </header>
+
+    <div class="results-facts" aria-label="Experiment at a glance">
+      <div class="results-fact"><strong>294.7<span>M</span></strong><span>Total parameters</span></div>
+      <div class="results-fact"><strong>6.0<span>B</span></strong><span>Processed token positions</span></div>
+      <div class="results-fact"><strong>183,106</strong><span>Successful optimizer updates</span></div>
+      <div class="results-fact"><strong>0</strong><span>Logged skipped updates</span></div>
+    </div>
+
+    <div class="results-content">
+      <section class="results-section" id="training" aria-labelledby="training-title">
+        <div class="results-section-id">01 <span aria-hidden="true">/</span> THE RUN</div>
+        <h2 id="training-title">The model kept learning.<br /><em>And the run finished.</em></h2>
+        <p>
+          The first 80 million tokens were a rehearsal. The pilot's monitored validation
+          loss fell from <strong>7.8979 to 4.1003</strong>, enough to justify continuing
+          with the same model and optimizer state. Then came the longer experiment:
+          three training sessions, an interruption and recovery, and a final checkpoint
+          at exactly <strong>183,106 successful updates</strong>.
+        </p>
+        <p>
+          The curves tell a quieter story than a single final number. Loss improved quickly
+          at the beginning, then more gradually as the model saw billions of token positions.
+          The final monitored validation loss was <strong>3.1825</strong>, compared with
+          a best observed value of <strong>3.1589</strong> near the end. A small late rise is
+          worth noting, but these observations alone cannot tell us whether an earlier
+          checkpoint would generalize better.
+        </p>
+        <figure class="results-figure results-figure-wide" id="fig-training">
+          <a href={trainingPlot} target="_blank" rel="noopener noreferrer" aria-label="Open the measured training and monitored validation loss curves at full size">
+            <img src={trainingPlot} width="1328" height="1185" loading="lazy" decoding="async"
+              alt="Two measured panels: the 0–80M-token pilot shows a steep loss decrease; the continuation to 6B tokens shows a slower decline in logged training and repeatedly monitored validation loss." />
+          </a>
+          <figcaption><strong>Figure 1.</strong> Pilot and continuation on separate horizontal scales so the first 80M tokens remain visible. Training uses logged windows (the continuation trend is smoothed); validation repeatedly evaluates a <strong>fixed prefix</strong> of the validation stream. These are monitoring curves, not an independent held-out evaluation. <span class="figure-source">Data: logged training and fixed-prefix validation windows, available in the <a href={evidence} download>evidence archive</a>.</span></figcaption>
+        </figure>
+        <p>
+          The full audit found <strong>zero skipped updates</strong> and no recorded nonfinite
+          gradient-norm events. Gradient clipping was applied to 2,440 of the 183,106
+          updates (1.33%). Its frequency increased late in training, a diagnostic signal
+          that deserves investigation in any future run, not proof that this run failed.
+          The measured continuation averaged about <strong>67,056 training tokens/s</strong>
+          on the H100 NVL, excluding evaluation, saving, and interruptions.
+        </p>
+        <p class="results-transition">A completed run shows that the engineering held together. It does not, by itself, tell us how well the language model generalizes. For that, we need to stop reusing the monitoring prefix.</p>
+      </section>
+
+      <section class="results-section" id="evaluation" aria-labelledby="evaluation-title">
+        <div class="results-section-id">02 <span aria-hidden="true">/</span> THE SCORE</div>
+        <h2 id="evaluation-title">A fresh view of the<br /><em>final checkpoint.</em></h2>
+        <p>
+          During training, validation checked the same short prefix again and again.
+          The final evaluation asked a different question: how well does the frozen
+          checkpoint predict tokens in <strong>64 preselected, separated windows</strong>
+          outside that repeatedly monitored prefix? Each window contains 1,024 next-token
+          targets, giving 65,536 scored predictions in total.
+        </p>
+        <div class="results-score-grid" aria-label="Fixed-window final evaluation metrics">
+          <div class="results-score"><span>Negative log-likelihood</span><strong>3.051</strong><small>nats / token</small></div>
+          <div class="results-score"><span>Perplexity</span><strong>21.14</strong><small>exp(mean NLL)</small></div>
+          <div class="results-score"><span>Top-1 accuracy</span><strong>42.27<span class="results-unit">%</span></strong><small>next-token predictions</small></div>
+        </div>
+        <p class="results-method"><strong>Measurement conditions.</strong> Final 294,676,808-parameter checkpoint; FineWeb-Edu prepared validation split; SmolLM2-135M tokenizer; 64 × 1,024 fixed shifted targets; local RTX 4050, FP32, PyTorch chunkwise KDA, zero state at each window. The published numbers were recomputed from the 64 per-window receipts, not from a new forward pass. <span class="figure-source">Data: 64 fixed-window evaluation records and the accompanying audit summary, available in the <a href={evidence} download>evidence archive</a>.</span></p>
+        <p>
+          This is evidence of next-token prediction learning, not a leaderboard score.
+          The windows come from the validation split, not a separate external test set.
+          Moreover, training used BF16 with a fused KDA kernel, while this evaluation used
+          the FP32 reference path. Numerical parity between those paths has not been
+          established, so the final NLL cannot be compared directly with the training
+          monitor's validation loss. There is no matched external baseline here.
+        </p>
+      </section>
+
+      <section class="results-section" id="generations" aria-labelledby="generations-title">
+        <div class="results-section-id">03 <span aria-hidden="true">/</span> THE TEXT</div>
+        <h2 id="generations-title">A sentence can sound right.<br /><em>Until it doesn't.</em></h2>
+        <p>
+          Scores are useful, but text exposes a different side of the model. Six fixed
+          English prompts were continued twice: once greedily, choosing the most likely
+          next token, and once with seeded sampling. Every continuation is exactly
+          48 generated tokens long. Here is one unedited pair.
+        </p>
+        <div class="results-prompt"><span>SHARED PROMPT</span><p>Once upon a time, in a small village</p></div>
+        <div class="results-generation-pair">
+          <article class="results-generation">
+            <div class="results-generation-head"><span class="results-gen-dot results-gen-greedy" aria-hidden="true"></span><strong>Greedy decoding</strong><span>48 TOKENS</span></div>
+            <blockquote>, there lived a man named Ahab. He was a man of great strength and courage, and he was a man of honor. He was a man of honor, and he was a man of honor. He was a man of honor</blockquote>
+          </article>
+          <article class="results-generation">
+            <div class="results-generation-head"><span class="results-gen-dot results-gen-sample" aria-hidden="true"></span><strong>Seeded sampling</strong><span>48 TOKENS</span></div>
+            <blockquote>, there stood a woman, her name being Kola, a woman in uniform, in a round-rigged suit, in a white robe and a white cloak.
+A young woman's costume, of gold-roled or j</blockquote>
+          </article>
+        </div>
+        <p>
+          Both continuations pick up the tone of a story. The greedy one falls into
+          an obvious loop. Sampling escapes the repeated phrase but wanders into
+          awkward, unfinished description. The cutoff is intentional: neither
+          completion was allowed to run beyond the fixed 48-token limit.
+        </p>
+        <figure class="results-figure" id="fig-repetition">
+          <a href={repetitionPlot} target="_blank" rel="noopener noreferrer" aria-label="Open the fixed-prompt repeated-trigram comparison at full size">
+            <img src={repetitionPlot} width="1600" height="900" loading="lazy" decoding="async"
+              alt="Horizontal bars comparing the repeated-trigram fraction for six prompts, with a higher repeated-trigram fraction for greedy decoding in all six pairs." />
+          </a>
+          <figcaption><strong>Figure 2.</strong> In the six fixed prompts, mean repeated-trigram fraction was <strong>32.61% for greedy</strong> and <strong>6.16% for sampling</strong>. These are within-sample descriptions, not statistically representative quality scores. <span class="figure-source">Data: fixed-prompt qualitative audit; all 12 original continuations are included in the <a href={evidence} download>evidence archive</a>.</span></figcaption>
+        </figure>
+        <p>
+          Across this small set, the model learned grammar, familiar phrasing, and local
+          genre cues. But more variety did not guarantee better meaning: sampled outputs
+          also included topic drift and factual errors. In particular, we did not run a
+          calibrated human-quality study, and these 48-token English snippets say little
+          about sustained coherence or reasoning. This is a <strong>base language model</strong>,
+          not an instruction-tuned conversational assistant.
+        </p>
+      </section>
+
+      <section class="results-section results-conclusion" id="conclusions" aria-labelledby="conclusions-title">
+        <div class="results-section-id">04 <span aria-hidden="true">/</span> WHAT REMAINS</div>
+        <h2 id="conclusions-title">What worked—and<br /><em>what we still don't know.</em></h2>
+        <p>
+          The result is not a reproduction of the full-size Kimi K3's capabilities.
+          It is a smaller, independently implemented language backbone that survived a
+          complete pretraining run, resumed from saved state, and produced measurable
+          next-token learning. That is a meaningful research-engineering result.
+        </p>
+        <p>
+          The gap between recognizable English and dependable language ability is just
+          as real. One checkpoint, one fixed-window evaluation, and twelve short
+          completions cannot establish factual reliability, broad reasoning, long-context
+          quality, or competitiveness with other models. Those are still open questions,
+          not results waiting for a more flattering description.
+        </p>
+        <p>
+          For now, the right decision was to <strong>stop this run and preserve its evidence</strong>.
+          More GPU time would be a new experiment, justified by a specific hypothesis
+          and an evaluation protocol—not an automatic extension of the same training job.
+        </p>
+      </section>
+
+      <aside class="results-provenance" aria-labelledby="evidence-title">
+        <div>
+          <span class="results-provenance-label">METHODS &amp; PROVENANCE</span>
+          <h2 id="evidence-title">Inspect the evidence.</h2>
+          <p>
+            The downloadable package contains the audit summaries, underlying monitoring
+            windows, 64 evaluation-window receipts, both measured figures, and all twelve
+            unedited continuations. Source archives, dataset shards and model weights are
+            not redistributed. The compact audit checks the supplied records; it does
+            not rerun training or independently rehash the original checkpoint bytes.
+          </p>
+          <a href={evidence} download>Download verified evidence (ZIP) <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="results-source-links">
+          <span>GO DEEPER</span>
+          <a href="/architecture/">Architecture <span aria-hidden="true">↗</span></a>
+          <a href="/training/">Training <span aria-hidden="true">↗</span></a>
+          <a href="https://github.com/adriaflores/kimi-k3-from-scratch/tree/v0.1.0" target="_blank" rel="noopener noreferrer">Versioned source <span aria-hidden="true">↗</span></a>
+        </div>
+      </aside>
+    </div>
+  </div>
 </SiteLayout>
+
+<style>
+  .results-story { --res-max: 800px; }
+  .results-lead { border-bottom: 0; padding-bottom: 28px; }
+  .results-lead h1 { max-width: 1000px; }
+  .results-lead > p { max-width: 805px; line-height: 1.78; }
+  .results-lead > p strong { color: var(--ink); font-weight: 600; }
+  .results-lead-meta { margin-top: 34px; font: 500 10px/1.8 var(--mono); letter-spacing: .07em; color: var(--muted); }
+  .results-lead-meta span { padding: 0 8px; }
+  .results-facts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); margin: 12px clamp(22px,5.2vw,84px) 0; padding: 29px 0 31px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .results-fact { display: flex; flex-direction: column; gap: 10px; padding: 2px 22px 0; border-left: 1px solid var(--rule); min-width: 0; }
+  .results-fact:first-child { padding-left: 0; border-left: 0; }
+  .results-fact strong { font: 400 clamp(30px, 3.4vw, 49px)/1.2 var(--serif); letter-spacing: -.05em; color: var(--ink); white-space: nowrap; }
+  .results-fact strong span { color: var(--accent); }
+  .results-fact > span { color: var(--muted); font: 500 12px/1.5 var(--sans); }
+  .results-content { width: min(100% - 44px, 1030px); margin: 0 auto; padding: 14px 0 100px; }
+  .results-section { max-width: var(--res-max); margin: 0 auto; padding: 82px 0 0; scroll-margin-top: 35px; }
+  .results-section + .results-section { margin-top: 70px; border-top: 1px solid var(--rule); }
+  .results-section-id, .results-provenance-label { font: 600 11px/1.6 var(--mono); letter-spacing: .13em; color: var(--accent); }
+  .results-section-id span { color: var(--muted); padding: 0 5px; }
+  .results-section h2 { font: 400 clamp(36px, 4.3vw, 55px)/1.16 var(--serif); letter-spacing: -.05em; margin: 21px 0 29px; color: var(--ink); }
+  .results-section h2 em { color: var(--accent); font-weight: 400; }
+  .results-section > p { font: 400 17.5px/1.86 var(--sans); color: var(--muted); margin: 19px 0; }
+  .results-section > p strong { color: var(--ink); font-weight: 600; }
+  .results-transition { padding: 17px 0 0; color: var(--ink) !important; }
+  .results-figure { margin: 40px 0 39px; max-width: 100%; }
+  .results-figure a { display: block; border: 1px solid var(--rule); background: #090b10; line-height: 0; }
+  .results-figure img { display: block; width: 100%; height: auto; }
+  .results-figure figcaption { font: 400 13px/1.77 var(--sans); color: var(--muted); margin-top: 15px; }
+  .results-figure figcaption strong { color: var(--ink); }
+  .figure-source { display: block; margin-top: 7px; font-size: 12px; }
+  .figure-source code { font: 11.5px/1.65 var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+  .results-score-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); margin: 35px 0 24px; }
+  .results-score { display: flex; flex-direction: column; gap: 4px; padding: 22px 18px; border-left: 1px solid var(--rule); }
+  .results-score:first-child { padding-left: 0; border-left: 0; }
+  .results-score > span { font: 500 11px/1.45 var(--mono); color: var(--muted); min-height: 32px; }
+  .results-score strong { font: 400 clamp(31px, 4vw, 48px)/1.2 var(--serif); color: var(--ink); letter-spacing: -.05em; }
+  .results-score .results-unit { font-size: .62em; color: var(--accent); }
+  .results-score small { color: var(--muted); font: 400 12px var(--sans); }
+  .results-section > p.results-method { font: 400 13px/1.75 var(--sans); color: var(--muted); margin: 0 0 27px; }
+  .results-prompt { margin: 32px 0 14px; padding: 18px 20px; border: 1px solid var(--rule); }
+  .results-prompt > span { display: block; color: var(--accent); font: 600 10px/1.5 var(--mono); letter-spacing: .1em; }
+  .results-prompt p { font: 400 20px/1.55 var(--serif); color: var(--ink); margin: 11px 0 0; }
+  .results-generation-pair { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+  .results-generation { min-width: 0; padding: 20px; border: 1px solid var(--rule); background: var(--surface-card); }
+  .results-generation-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .results-generation-head strong { font: 600 12px var(--sans); color: var(--ink); }
+  .results-generation-head > span:last-child { margin-left: auto; font: 500 10px var(--mono); color: var(--muted); }
+  .results-gen-dot { display: inline-block; height: 8px; width: 8px; border-radius: 50%; }
+  .results-gen-greedy { background: #8fb7ff; }
+  .results-gen-sample { background: #f0be83; }
+  .results-generation blockquote { white-space: pre-wrap; font: 400 14px/1.76 var(--sans); color: var(--muted); margin: 20px 0 0; overflow-wrap: anywhere; }
+  .results-conclusion { padding-bottom: 43px; }
+  .results-provenance { max-width: 900px; margin: 65px auto 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 31px 0 34px; display: grid; grid-template-columns: minmax(0,1fr) 195px; gap: 45px; }
+  .results-provenance h2 { font: 400 29px/1.24 var(--serif); margin: 12px 0; color: var(--ink); }
+  .results-provenance p { margin: 0 0 19px; font: 400 13.5px/1.78 var(--sans); color: var(--muted); }
+  .results-provenance a { color: var(--accent); font: 600 12px/1.6 var(--sans); text-decoration: none; }
+  .results-provenance a:hover { text-decoration: underline; }
+  .results-source-links { border-left: 1px solid var(--rule); padding-left: 28px; display: flex; flex-direction: column; gap: 12px; }
+  .results-source-links > span { font: 600 10px var(--mono); color: var(--muted); letter-spacing: .13em; margin: 3px 0 3px; }
+  @media (max-width: 800px) {
+    .results-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; }
+    .results-fact:nth-child(3) { padding-left: 0; border-left: 0; }
+    .results-fact:nth-child(-n+2) { border-bottom: 1px solid var(--rule); padding-bottom: 20px; }
+    .results-section { padding-top: 68px; }
+    .results-section + .results-section { margin-top: 42px; }
+    .results-lead-meta { font-size: 9px; }
+  }
+  @media (max-width: 590px) {
+    .results-content { width: min(100% - 36px, 1030px); }
+    .results-lead h1 { font-size: clamp(39px, 10.2vw, 54px); }
+    .results-lead > p { font-size: 16px; }
+    .results-fact { padding-left: 15px; }
+    .results-fact strong { font-size: clamp(28px, 8vw, 38px); }
+    .results-fact > span { font-size: 11px; }
+    .results-section h2 { font-size: clamp(34px, 8vw, 43px); }
+    .results-section > p { font-size: 16.5px; }
+    .results-score-grid { gap: 0; }
+    .results-score { padding: 17px 9px; }
+    .results-score > span { font-size: 9px; min-height: 46px; }
+    .results-score strong { font-size: clamp(25px, 7vw, 33px); }
+    .results-score small { font-size: 10px; }
+    .results-generation-pair { grid-template-columns: 1fr; }
+    .results-generation { padding: 19px; }
+    .results-provenance { grid-template-columns: 1fr; gap: 27px; }
+    .results-source-links { padding: 22px 0 0; border-left: 0; border-top: 1px solid var(--rule); }
+  }
+</style>

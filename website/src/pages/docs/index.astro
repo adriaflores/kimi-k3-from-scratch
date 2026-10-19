@@ -1,10 +1,25 @@
 ---
 import SiteLayout from "../../layouts/SiteLayout.astro";
+import DocsTree from "../../components/DocsTree.astro";
+import { createDocsTree, getDocsEntries } from "../../lib/docs";
+import { DOC_FILES, SOURCE_COMMIT } from "../../data/docs-files";
+import "../../styles/docs.css";
+const pages = await getDocsEntries();
+const visiblePaths = pages.map(page => page.data.sourcePath);
+const tree = createDocsTree();
+const count = { src: DOC_FILES.filter(([p]) => p.startsWith("src/")).length,
+  scripts: DOC_FILES.filter(([p]) => p.startsWith("scripts/")).length };
 ---
-<SiteLayout title="Documentation deferred — Kimi K3 from Scratch" description="The source-level documentation will be published after the repository cleanup.">
-  <section class="page-intro">
-    <div class="page-kicker">TECHNICAL REFERENCE / DEFERRED</div>
-    <h1>Docs, <em>later.</em></h1>
-    <p>The file-by-file technical reference will be published after the source cleanup. For now, explore the <a href="/architecture/">architecture</a>, the <a href="/training/">training process</a> or the <a href="/results/">experimental evidence</a>.</p>
+<SiteLayout title="Docs — Kimi K3 from Scratch" description="Explore the Kimi K3 source tree and its versioned, file-by-file implementation documentation." current="docs">
+  <section class="page-intro docs-intro">
+    <div class="page-kicker">04 / SOURCE REFERENCE</div>
+    <h1>Inside the <em>implementation.</em></h1>
+    <p>A file-by-file reference for the PyTorch language backbone, training system, and supporting tools. Choose a file to read its implementation walkthrough or inspect the exact source revision.</p>
+    <div class="docs-summary-line"><span>{DOC_FILES.length} Python files</span><span>{count.src} in src/</span><span>{count.scripts} in scripts/</span></div>
+  </section>
+  <section class="docs-index" aria-label="Source code documentation explorer">
+    <div class="docs-index-meta"><h2>Repository explorer</h2><p>Folders follow the original source hierarchy. Files without a completed review remain listed but are not linked to unfinished documentation.</p></div>
+    <DocsTree nodes={tree} visiblePaths={visiblePaths} />
+    <p class="docs-revision">Documented source revision: <a href={`https://github.com/adriaflores/kimi-k3-from-scratch/tree/${SOURCE_COMMIT}`} target="_blank" rel="noopener noreferrer"><code>{SOURCE_COMMIT.slice(0, 12)}</code> ↗</a></p>
   </section>
 </SiteLayout>
