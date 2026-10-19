@@ -1,40 +1,164 @@
 ---
 import SiteLayout from "../layouts/SiteLayout.astro";
-const sections = [
-  { index: "01", title: "Architecture", href: "/architecture/", kicker: "THE MODEL", description: "From the mechanisms described in the paper to a working language backbone: hybrid attention, attention residuals, MoE, and model assembly." },
-  { index: "02", title: "Training", href: "/training/", kicker: "THE PROCESS", description: "From a first working training loop to instrumented experiments, scaling studies, GPU qualification, and full pretraining." },
-  { index: "03", title: "Results", href: "/results/", kicker: "THE EVIDENCE", description: "Implementation checks and experimental results throughout the development, with carefully distinguished final-model evaluation." },
+import "../styles/overview.css";
+
+// Mirrors the reduced-scale model configuration, from input to output.
+// This is a conceptual block inventory, not a computation or residual-flow graph.
+const attention = ["KDA", "KDA", "KDA", "MLA", "KDA", "KDA", "KDA", "MLA", "KDA", "KDA", "KDA", "MLA", "MLA"];
+const layers = attention.map((kind, index) => ({
+  number: String(index + 1).padStart(2, "0"),
+  kind,
+  feedforward: index === 0 ? "Dense" : "MoE",
+}));
+
+const routes = [
+  { number: "01", label: "Architecture", type: "THE MODEL", href: "/architecture/", description: "The mechanisms, their mathematics, and the PyTorch implementation." },
+  { number: "02", label: "Training", type: "THE ENGINEERING", href: "/training/", description: "From component checks to a completed, recoverable pretraining run." },
+  { number: "03", label: "Results", type: "THE EVIDENCE", href: "/results/", description: "Measurements, generations, methodological limits, and what remains unknown." },
+  { number: "04", label: "Docs", type: "THE CODE", href: "/docs/", description: "A file-by-file map of the model, the trainer, and supporting scripts." },
 ];
 ---
-<SiteLayout title="Kimi K3 from Scratch — Project Index" description="A research engineering project index: architecture, training journey and experimental results.">
-  <section class="gateway-hero">
-    <div class="gateway-label"><span class="tiny-diamond"></span> INDEPENDENT RESEARCH ENGINEERING <span class="gateway-year">/ 2026</span></div>
-    <div class="gateway-grid">
-      <div>
-        <h1>Kimi K3<br /><em>from scratch.</em></h1>
-        <p>A scaled language backbone built in PyTorch, then brought through the engineering work required for pretraining. Explore the model, the process, and the evidence.</p>
-        <div class="gateway-links"><a href="https://github.com/adriaflores/kimi-k3-from-scratch" target="_blank" rel="noopener noreferrer">Explore source ↗</a><a href="https://adriaflores.com" target="_blank" rel="noopener noreferrer">About the author ↗</a></div>
+<SiteLayout
+  title="Kimi K3 from Scratch — Independent Research Engineering"
+  description="An independent 294.7M-parameter, Kimi K3-inspired language backbone implemented in PyTorch and trained on 6B processed token positions. Explore the architecture, engineering, results, and source documentation."
+>
+  <div class="overview">
+    <section class="ov-hero ov-frame" aria-labelledby="ov-title">
+      <div class="ov-hero-copy">
+        <p class="ov-kicker"><span class="ov-kicker-symbol" aria-hidden="true"></span> INDEPENDENT RESEARCH ENGINEERING <span class="ov-kicker-year">/ 2026</span></p>
+        <h1 id="ov-title">Kimi K3<br /><em>from scratch.</em></h1>
+        <p class="ov-hero-deck">A language model is more than an architecture on paper.</p>
+        <p class="ov-hero-lead">I built a scaled, Kimi K3-inspired backbone in PyTorch, then engineered and completed its six-billion-token pretraining run.</p>
+        <div class="ov-hero-actions">
+          <a class="ov-link-primary" href="/architecture/">Explore the architecture <span aria-hidden="true">↗</span></a>
+          <a class="ov-link-text" href="/results/">See what it learned <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="ov-hero-foot"><span class="ov-rule-short" aria-hidden="true"></span><span>Independent implementation · Base language model · Not an official Kimi release</span></div>
       </div>
-      <div class="gateway-diagram" aria-label="From paper to the model, training system and results">
-        <span class="visual-eyebrow">THE RESEARCH ENGINEERING PATH</span>
-        <div class="gateway-node">Paper & research mechanisms <span>01</span></div>
-        <div class="gateway-flow">↓</div>
-        <div class="gateway-node accent-node">Model implementation <span>02</span></div>
-        <div class="gateway-flow">↓</div>
-        <div class="gateway-node">Training system & experiments <span>03</span></div>
-        <div class="gateway-flow">↓</div>
-        <div class="gateway-node">Measured evidence <span>04</span></div>
+
+      <figure class="ov-machine" data-view="attention" aria-label="Conceptual inventory of the thirteen decoder layers">
+        <div class="ov-machine-header">
+          <div><span class="ov-mono overline">MODEL / 300M CONFIGURATION</span><h2>The hybrid<br /><em>backbone.</em></h2></div>
+          <span class="ov-machine-big" aria-hidden="true">13</span>
+        </div>
+        <div class="ov-machine-legend" aria-label="Attention composition">
+          <span><i class="ov-swatch ov-swatch-kda" aria-hidden="true"></i> 09 KDA</span>
+          <span><i class="ov-swatch ov-swatch-mla" aria-hidden="true"></i> 04 Gated MLA</span>
+        </div>
+        <div class="ov-machine-toggle" role="group" aria-label="Highlight layer components" hidden>
+          <button type="button" class="is-active" data-view-button="attention" aria-pressed="true">Attention</button>
+          <button type="button" data-view-button="feedforward" aria-pressed="false">Feed-forward</button>
+        </div>
+        <div class="ov-layer-head" aria-hidden="true"><span>LAYER</span><span>ATTENTION</span><span>FEED-FORWARD</span></div>
+        <ol class="ov-layer-list" aria-label="Thirteen decoder blocks, ordered from input to output">
+          {layers.map((layer) => (
+            <li class:list={["ov-layer", layer.kind === "KDA" ? "ov-layer-kda" : "ov-layer-mla"]}>
+              <span class="ov-layer-index">{layer.number}</span>
+              <span class="ov-attention">
+                <i class="ov-layer-rail" aria-hidden="true"></i><strong>{layer.kind}</strong>
+              </span>
+              <span class:list={["ov-ffn", layer.feedforward === "Dense" ? "ov-ffn-dense" : "ov-ffn-moe"]}>
+                <i class="ov-ffn-mark" aria-hidden="true"></i>{layer.feedforward}
+              </span>
+            </li>
+          ))}
+        </ol>
+        <figcaption class="ov-machine-footer">
+          <span>INPUT → 13 DECODER BLOCKS → OUTPUT</span>
+          <a href="/architecture/">How the blocks fit together <span aria-hidden="true">↗</span></a>
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="ov-facts" aria-label="The project in numbers">
+      <div class="ov-frame ov-facts-grid">
+        <div class="ov-fact"><strong>294.7<span>M</span></strong><span>Total parameters</span></div>
+        <div class="ov-fact"><strong>~100.4<span>M</span></strong><span>Active per token</span></div>
+        <div class="ov-fact"><strong>6.0<span>B</span></strong><span>Processed token positions</span></div>
+        <div class="ov-fact"><strong>183,106</strong><span>Successful optimizer updates</span></div>
       </div>
+      <p class="ov-facts-note ov-frame">Figures refer to this reduced-scale experiment, not the official Kimi K3 model. <a href="/results/">Methods and evidence ↗</a></p>
+    </section>
+
+    <section class="ov-story ov-frame" aria-labelledby="ov-story-title">
+      <div class="ov-section-rail"><span>01 / THE WORK</span><span class="ov-rail-line" aria-hidden="true"></span></div>
+      <div class="ov-story-main">
+        <p class="ov-mono ov-section-kicker">BEYOND THE PAPER</p>
+        <h2 id="ov-story-title">The interesting part was<br /><em>making it all work.</em></h2>
+        <p class="ov-section-lead">A model can look convincing in a diagram long before it can survive a real training run. This project followed the engineering questions all the way through.</p>
+        <div class="ov-journey" aria-label="Research engineering sequence">
+          <div class="ov-journey-step"><span class="ov-step-num">01</span><span class="ov-step-connector" aria-hidden="true"></span><h3>Implement</h3><p>Translate KDA, gated MLA, AttnRes and Stable LatentMoE into a working scaled backbone.</p></div>
+          <div class="ov-journey-step"><span class="ov-step-num">02</span><span class="ov-step-connector" aria-hidden="true"></span><h3>Verify & optimize</h3><p>Test equivalence, build the training system and qualify execution on an H100 NVL.</p></div>
+          <div class="ov-journey-step"><span class="ov-step-num">03</span><span class="ov-step-connector" aria-hidden="true"></span><h3>Train & recover</h3><p>Complete the planned token budget with restorable checkpoints and auditable monitoring.</p></div>
+          <div class="ov-journey-step"><span class="ov-step-num">04</span><span class="ov-step-connector" aria-hidden="true"></span><h3>Evaluate</h3><p>Inspect next-token prediction and actual generations—without mistaking them for a benchmark.</p></div>
+        </div>
+        <p class="ov-implementation-note">The backbone follows published research mechanisms, but the scaled implementation and training integration are independent. The accelerated KDA CUDA path reuses upstream Flash-Linear-Attention rather than an original kernel.</p>
+        <a class="ov-inline-link" href="/training/">Follow the engineering journey <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+
+    <section class="ov-outcome" aria-labelledby="ov-outcome-title">
+      <div class="ov-frame ov-outcome-layout">
+        <div class="ov-outcome-copy">
+          <p class="ov-mono ov-section-kicker">02 / THE EVIDENCE</p>
+          <h2 id="ov-outcome-title">A finished run.<br /><em>An honest result.</em></h2>
+          <p>The model learned recognizable language structure, but its generations still reveal repetition and drift. The outcome is a trained research backbone, not a conversational assistant.</p>
+          <a class="ov-inline-link" href="/results/#evaluation">Read the evaluation <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="ov-outcome-numbers" aria-label="Separate post-training next-token evaluation">
+          <div class="ov-outcome-topline">POST-TRAINING / NEXT-TOKEN EVALUATION</div>
+          <div class="ov-outcome-primary"><strong>21.14</strong><span>Perplexity</span></div>
+          <div class="ov-outcome-secondary"><div><strong>3.0510</strong><span>NLL · nats/token</span></div><div><strong>42.27%</strong><span>Top-1 accuracy</span></div></div>
+          <p>64 preselected windows · 65,536 validation token targets. Different from the training monitor; not an external benchmark or baseline comparison.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="ov-explore ov-frame" aria-labelledby="ov-explore-title">
+      <div class="ov-section-rail"><span>03 / EXPLORE</span><span class="ov-rail-line" aria-hidden="true"></span></div>
+      <div class="ov-explore-main">
+        <p class="ov-mono ov-section-kicker">FOUR WAYS INTO THE PROJECT</p>
+        <h2 id="ov-explore-title">Follow your <em>curiosity.</em></h2>
+        <div class="ov-route-grid">
+          {routes.map((route) => (
+            <a href={route.href} class="ov-route">
+              <span class="ov-route-top"><span>{route.number} / {route.type}</span><span aria-hidden="true">↗</span></span>
+              <strong>{route.label}</strong>
+              <span class="ov-route-description">{route.description}</span>
+              <span class="ov-route-bottom">Explore {route.label} <span aria-hidden="true">→</span></span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <div class="ov-closing ov-frame">
+      <span class="ov-mono">BUILT TO BE INSPECTED</span>
+      <p>Every layer has code. Every run has a method. Every result has a limit.</p>
+      <div><a href="https://github.com/adriaflores/kimi-k3-from-scratch" target="_blank" rel="noopener noreferrer">Source on GitHub ↗</a><a href="https://adriaflores.com" target="_blank" rel="noopener noreferrer">About the author ↗</a></div>
     </div>
-  </section>
-  <section class="gateway-sections" aria-label="Explore the project">
-    <div class="gateway-head"><span class="visual-eyebrow">EXPLORE THE PROJECT</span><span>Three routes into the work</span></div>
-    <div class="gateway-card-grid">
-      {sections.map(section => <a class="gateway-card" href={section.href}>
-        <div class="gateway-card-top"><span>{section.index} / {section.kicker}</span><span>↗</span></div>
-        <h2>{section.title}</h2><p>{section.description}</p><span class="gateway-card-bottom">Explore {section.title} →</span>
-      </a>)}
-    </div>
-    <p class="gateway-note">This page is an index, not the final project overview. The overview and file-by-file reference documentation will be developed after the core sections stabilize.</p>
-  </section>
+  </div>
 </SiteLayout>
+
+<script>
+  // Progressive enhancement only. The complete block inventory remains readable
+  // without JavaScript; highlighting just changes which column is emphasized.
+  const machine = document.querySelector<HTMLElement>(".ov-machine");
+  if (machine) {
+    const controls = machine.querySelector<HTMLElement>(".ov-machine-toggle");
+    if (controls) {
+      controls.hidden = false;
+      const buttons = controls.querySelectorAll<HTMLButtonElement>("button[data-view-button]");
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          machine.dataset.view = button.dataset.viewButton;
+          buttons.forEach((item) => {
+            const active = item === button;
+            item.setAttribute("aria-pressed", String(active));
+            item.classList.toggle("is-active", active);
+          });
+        });
+      });
+    }
+  }
+</script>

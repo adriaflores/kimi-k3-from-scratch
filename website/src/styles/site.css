@@ -467,3 +467,17 @@ html[data-theme="dark"] .chapter-body.doc-prose pre.astro-code span { color:var(
   overflow-wrap:break-word;
   min-width:0;
 }
+
+
+/* K3-wide-site-chrome: begin */
+/* Keep the reading area bounded while the navigation/footer use the viewport width. */
+.site-shell {
+  max-width: none;
+  margin-inline: 0;
+}
+.site-shell > main {
+  width: 100%;
+  max-width: 1512px;
+  margin-inline: auto;
+}
+/* K3-wide-site-chrome: end */
