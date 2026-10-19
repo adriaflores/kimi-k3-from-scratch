@@ -98,7 +98,7 @@ pnpm-debug.log*
 # website/ has its own .gitignore for dist/ and .astro/
 
 # ---- Generated benchmark/result output ----
-results/
+/results/
 
 # ---- Stray backups ----
 *.bak
