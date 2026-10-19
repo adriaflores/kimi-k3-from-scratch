@@ -4,6 +4,7 @@ import {mkdtemp, mkdir, writeFile, rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {inspectBuiltSite} from './verify-build.mjs';
+import { execFileSync } from "node:child_process";
 
 async function fixture(fn){
  const root=await mkdtemp(path.join(os.tmpdir(),'kimi-build-'));
@@ -49,4 +50,84 @@ test('duplicate chapter orders are detected before parallel integration', async(
   await put('content/architecture/duplicate.md','---\nstatus: draft\norder: 1\n---\n');
   assert.match((await inspectBuiltSite({root})).join('\n'),/duplicate order/);
  });
+});
+
+test("Results images and downloads must exist in the build", async () => {
+  await fixture(async ({ root, put }) => {
+    await put(
+      "website/dist/results/index.html",
+      '<img src="/assets/site/results/training-monitoring.png">' +
+      '<a href="/assets/site/results/verified-evidence.zip" download>Evidence</a>'
+    );
+
+    const missing = (await inspectBuiltSite({ root })).join("\n");
+
+    assert.match(
+      missing,
+      /built asset is missing: \/assets\/site\/results\/training-monitoring\.png/
+    );
+
+    assert.match(
+      missing,
+      /built asset is missing: \/assets\/site\/results\/verified-evidence\.zip/
+    );
+
+    await put(
+      "website/dist/assets/site/results/training-monitoring.png",
+      "image"
+    );
+
+    await put(
+      "website/dist/assets/site/results/verified-evidence.zip",
+      "archive"
+    );
+
+    assert.deepEqual(await inspectBuiltSite({ root }), []);
+  });
+});
+test("Untracked Results assets fail even when present in dist", async () => {
+  await fixture(async ({ root, put }) => {
+    await put(
+      "assets/site/architecture/published/fig.svg",
+      "<svg/>"
+    );
+
+    await put(
+      "assets/site/results/training-monitoring.png",
+      "image"
+    );
+
+    await put(
+      "website/dist/assets/site/results/training-monitoring.png",
+      "image"
+    );
+
+    await put(
+      "website/dist/results/index.html",
+      '<img src="/assets/site/results/training-monitoring.png">'
+    );
+
+    execFileSync("git", ["init", "-q"], { cwd: root });
+
+    execFileSync(
+      "git",
+      ["add", "assets/site/architecture/published/fig.svg"],
+      { cwd: root }
+    );
+
+    const missing = (await inspectBuiltSite({ root })).join("\n");
+
+    assert.match(
+      missing,
+      /asset is not tracked by Git: \/assets\/site\/results\/training-monitoring\.png/
+    );
+
+    execFileSync(
+      "git",
+      ["add", "assets/site/results/training-monitoring.png"],
+      { cwd: root }
+    );
+
+    assert.deepEqual(await inspectBuiltSite({ root }), []);
+  });
 });
