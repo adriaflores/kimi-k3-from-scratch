@@ -43,7 +43,7 @@ Once computation is compatible, performance seems straightforward. Count the tok
 
 Imagine two clocks running beside the training job. The first advances only while batches are being fetched, passed through the model, differentiated, and used for updates. The second keeps running during validation, checkpoint saving, reporting, and profiling too. Both clocks tell the truth. They answer different questions.
 
-<figure id="fig-two-clocks" class="reading-figure" data-kind="conceptual">
+<figure id="fig-two-clocks" class="reading-figure reading-figure--wide" data-kind="conceptual">
   <a href="/assets/site/training/gpu-qualification/two-clocks.webp"
      target="_blank" rel="noopener noreferrer"
      aria-label="Open the two-clocks diagram at full size">

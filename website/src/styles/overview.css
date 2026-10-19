@@ -204,3 +204,9 @@
   .overview .ov-link-primary, .overview .ov-layer-rail, .overview .ov-ffn { transition: none; }
   .overview .ov-link-primary:hover { transform: none; }
 }
+/* Wider editorial compositions on large displays. */
+@media (min-width: 1600px) {
+  .overview .ov-frame {
+    width: calc(100% - 2 * var(--ov-frame-edge));
+  }
+}

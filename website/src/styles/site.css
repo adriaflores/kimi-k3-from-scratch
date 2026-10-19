@@ -480,4 +480,49 @@ html[data-theme="dark"] .chapter-body.doc-prose pre.astro-code span { color:var(
   max-width: 1512px;
   margin-inline: auto;
 }
+
+/* Wide-screen layout: preserve reading widths, expand page composition. */
+@media (min-width: 1600px) {
+  .site-shell > main {
+    max-width: 2600px;
+  }
+
+  /* Architecture and Training overview pages. */
+  .chapter-index,
+  .chapter-list,
+  .training-phases,
+  .page-endnote {
+    max-width: none;
+  }
+
+  .arch-schematic {
+    max-width: calc(100% - 2 * clamp(22px, 5.2vw, 84px));
+  }
+
+  /* Wider page canvas, but unchanged editorial reading column. */
+  .chapter-shell {
+    max-width: 2600px;
+  }
+
+  .chapter-header .chapter-eyebrow {
+    width: calc(
+      min(100vw, 2600px) - 2 * clamp(22px, 5.2vw, 84px)
+    );
+  }
+}
+/* Optional wide figures in research chapters.
+   Keep prose narrow and preserve the sticky table of contents. */
+@media (min-width: 1280px) {
+  .chapter-body.doc-prose .reading-figure--wide {
+    width: min(
+      1180px,
+      calc(50vw + 360px - clamp(22px, 5.2vw, 84px))
+    );
+    max-width: none;
+  }
+
+  .chapter-body.doc-prose .reading-figure--wide figcaption {
+    max-width: var(--chapter-reading-width);
+  }
+}
 /* K3-wide-site-chrome: end */

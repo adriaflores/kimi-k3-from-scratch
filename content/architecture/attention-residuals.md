@@ -53,7 +53,7 @@ One small detail makes this more reliable: **RMSNorm is applied when scoring eac
   <p class="reading-answer"><strong>No.</strong> The query is shared, but each token carries its own earlier representations. Different candidates produce different scores, so the same sublayer can retrieve different parts of the depth history for different tokens.</p>
 </aside>
 
-<figure id="fig-depth-retrieval" class="reading-figure" data-kind="conceptual">
+<figure id="fig-depth-retrieval" class="reading-figure reading-figure--wide" data-kind="conceptual">
   <a
     href="/assets/site/architecture/attention-residuals/depth-retrieval.webp"
     target="_blank"
@@ -90,7 +90,7 @@ The difference is what we keep separately, not how we choose among the candidate
 A block summary isn't a magical compression that preserves every layer independently. Inside each block we've returned to plain addition. We're deliberately trading some freedom to revisit individual layers for a much smaller collection of useful checkpoints. That makes the design practical without throwing away the central idea.
 
 
-<figure id="fig-block-attnres" class="reading-figure" data-kind="conceptual">
+<figure id="fig-block-attnres" class="reading-figure reading-figure--wide" data-kind="conceptual">
   <a
     href="/assets/site/architecture/attention-residuals/block-attnres.webp"
     target="_blank"
