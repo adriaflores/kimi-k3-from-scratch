@@ -2,7 +2,7 @@
 title: "generate.py — Checkpoint text and token generation"
 description: "Parses text or raw-token prompts, loads a trainer-format checkpoint and emits generated tokens as JSON."
 sourcePath: "scripts/generate.py"
-status: review
+status: published
 ---
 
 [`scripts/generate.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/scripts/generate.py) exposes generation from compatible Kimi K3 trainer checkpoints without imposing the original evaluation protocol. It is an interface around [`generate_tokens()`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/inference.py#L131-L158), not a separate decoding engine. The implementation details are documented in [inference.py](/docs/src/kimi_k3/inference/). Two input paths matter: text prompts use a Hugging Face tokenizer; raw token IDs avoid loading a tokenizer, making an offline checkpoint smoke test possible.

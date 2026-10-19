@@ -2,7 +2,7 @@
 title: "DenseFFN and SituGLU"
 description: "Implements the FP32-internal SiTU-GLU gate and a two-linear feed-forward path with conditional compilation."
 sourcePath: "src/kimi_k3/ffn/dense_ffn.py"
-status: review
+status: published
 ---
 
 The file defines the elementwise SiTU-GLU activation and the dense/expert feed-forward block. `DenseFFN.forward(x)` maps a tensor with last dimension `hidden_size` back to the same width, preserving all leading dimensions. It is called directly by dense decoder layers and used as the expert network inside Stable LatentMoE.

@@ -2,7 +2,7 @@
 title: "Attention package exports"
 description: "Re-exports the readable KDA implementations and GatedMLA from the attention package."
 sourcePath: "src/kimi_k3/attention/__init__.py"
-status: review
+status: published
 ---
 
 This package initializer exposes three named implementations through `kimi_k3.attention`: `KDARecurrent`, `KDAChunkwise`, and `GatedMLA`. Its full implementation consists of three relative imports [source L1–L3](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/attention/__init__.py#L1-L3).

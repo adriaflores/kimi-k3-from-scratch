@@ -2,7 +2,7 @@
 title: "convert_assets_to_webp.py — Lossless asset conversion"
 description: "Converts eligible assets to verified lossless WebP and updates matching Markdown asset paths."
 sourcePath: "scripts/convert_assets_to_webp.py"
-status: review
+status: published
 ---
 
 [`scripts/convert_assets_to_webp.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/scripts/convert_assets_to_webp.py) is a repository-maintenance command, not a model or training utility. It searches the repository's `assets/` subtree for raster images, converts them to lossless WebP, verifies that the new file can be decoded, **deletes the original**, then replaces matching asset-path strings inside Markdown under `content/`. The order matters: a failed conversion must not remove an original source image, while a completed conversion can require subsequent content-link rewriting.

@@ -2,7 +2,7 @@
 title: "train.py — Training entry point"
 description: "Resolves training arguments and model selection, restores state, creates a run session and invokes the trainer."
 sourcePath: "scripts/train.py"
-status: review
+status: published
 ---
 
 [`scripts/train.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/scripts/train.py) is the boundary between a command-line experiment recipe and the training engine. Its responsibility is to select a model, reconcile YAML and CLI configuration, initialize the process and data streams, restore a checkpoint when requested, record the run context, and call [`train()`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/trainer.py). It does not contain the update loop, scheduler logic, numerical kernels or checkpoint serialization implementation; those belong to the imported training modules.

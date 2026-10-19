@@ -2,7 +2,7 @@
 title: "KimiK3, decoder blocks and configuration"
 description: "Assembles the hybrid-attention decoder, attention residuals, tied embeddings, and language-model loss."
 sourcePath: "src/kimi_k3/model.py"
-status: review
+status: published
 ---
 
 `model.py` is the model's composition layer. It selects an attention implementation for each decoder block, decides whether that block uses a dense FFN or Stable LatentMoE, manages **Attention Residuals (AttnRes)** across blocks, and exposes the vocabulary projection and optional next-token cross-entropy. The internal KDA/MLA/MoE algorithms are documented in their own source files.

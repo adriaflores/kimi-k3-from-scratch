@@ -3,7 +3,7 @@ title: "Stable LatentMoE & Quantile Balancing"
 description: "How Kimi K3 makes room for many experts, keeps their outputs under control, and gives quieter experts a chance."
 question: "How can a model have hundreds of experts without consulting every one for every token?"
 order: 4
-status: draft
+status: published
 ---
 
 Imagine a kitchen with dozens of chefs. Every new order could be passed to every chef, but that would be a strange way to run a restaurant. Most dishes don't need the entire kitchen. What we want is a small team for each order, chosen according to what needs doing.

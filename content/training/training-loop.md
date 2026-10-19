@@ -3,7 +3,7 @@ title: "Training Loop"
 description: "How a stream of tokens becomes a trustworthy parameter update, and how we make sure the next update is still the right one."
 question: "How do you know a model is really learning, rather than just running?"
 order: 1
-status: draft
+status: published
 ---
 
 Imagine teaching someone to finish your sentences. You say, “The cat sat on the…” and ask them to guess the next word. They guess, you reveal the answer, and they adjust their intuition a little. Do this enough times and, hopefully, their guesses improve.

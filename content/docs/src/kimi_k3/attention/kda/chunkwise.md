@@ -2,7 +2,7 @@
 title: "KDAChunkwise"
 description: "A source-level walkthrough of the reference PyTorch Kimi Delta Attention implementation, from causal QKV projections to chunkwise UT solving and recurrent-state propagation."
 sourcePath: "src/kimi_k3/attention/kda/chunkwise.py"
-status: review
+status: published
 ---
 
 This file implements **`KDAChunkwise`**, the readable PyTorch reference for Kimi Delta Attention (KDA). Rather than updating memory token by token, it expresses the interactions within each chunk as batched matrix operations, then carries one matrix-valued state between chunks. The result is intended to reproduce the token-recurrent computation, without introducing a custom fused kernel.

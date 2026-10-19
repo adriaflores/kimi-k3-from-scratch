@@ -3,7 +3,7 @@ title: "Hybrid Attention"
 description: "A compact memory that can correct itself, with occasional global attention when the model needs to look back."
 question: "How can a model remember a long sequence without keeping everything in its working memory?"
 order: 1
-status: draft
+status: published
 ---
 
 Imagine reading a long document with a small notebook beside you. You cannot copy every sentence, so you keep updating a few useful notes. Most of the time, that's enough. But sometimes you want to check the exact wording of something you read ten pages ago. Then a summary, however good, isn't quite the same as having the page in front of you.

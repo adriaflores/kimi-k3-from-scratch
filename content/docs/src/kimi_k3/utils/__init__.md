@@ -2,7 +2,7 @@
 title: "Utility package export"
 description: "Exports load_config as the utility package configuration reader."
 sourcePath: "src/kimi_k3/utils/__init__.py"
-status: review
+status: published
 ---
 
 This one-line initializer re-exports the exact function implemented in `utils/config.py` [source L1–L1](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/utils/__init__.py#L1-L1):

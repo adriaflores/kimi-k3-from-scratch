@@ -2,7 +2,7 @@
 title: "summarize_training_run.py — Session log audit"
 description: "Validates and aggregates the latest training session from its manifest and newline-delimited metrics."
 sourcePath: "scripts/summarize_training_run.py"
-status: review
+status: published
 ---
 
 [`scripts/summarize_training_run.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/scripts/summarize_training_run.py) converts raw run logs into a compact, machine-readable acceptance summary. It reads **only** `run.json` and `metrics.jsonl`, streaming metrics one line at a time. It never loads tensors, checkpoints or profiler traces, so it can inspect a run without importing PyTorch. Its conclusions concern the **logged evidence**, not equality of checkpoint contents or physical proof of uninterrupted execution. The event producer is documented in [metrics.py](/docs/src/kimi_k3/training/metrics/).

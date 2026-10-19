@@ -2,7 +2,7 @@
 title: "evaluate_windows"
 description: "Computes exploratory next-token NLL, perplexity and top-1 accuracy over nonoverlapping prepared-token windows."
 sourcePath: "src/kimi_k3/evaluation.py"
-status: review
+status: published
 ---
 
 `evaluate_windows` is a **read-only exploratory** evaluation helper. Its module docstring explicitly states that it is *not* the original pre-registered 64-window protocol and does not inherit that protocol's exclusion or identity guarantees [source L1–L5](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/evaluation.py#L1-L5). The function operates on a `ShardedTokenDataset`-compatible token stream and a model that returns `(logits, loss)`.

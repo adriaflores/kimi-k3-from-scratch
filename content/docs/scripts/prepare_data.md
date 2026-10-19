@@ -2,7 +2,7 @@
 title: "prepare_data.py — Reproducible token-shard preparation"
 description: "Resolves a versioned Parquet corpus, shuffles and tokenizes documents, and publishes resumable train/validation shards."
 sourcePath: "scripts/prepare_data.py"
-status: review
+status: published
 ---
 
 [`scripts/prepare_data.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/scripts/prepare_data.py) converts a Hugging Face-hosted Parquet corpus into fixed-capacity NumPy token shards for the model's streaming data loader. The hard part is not calling a tokenizer. The file must establish **which exact rows were visited, in what order, how each was assigned to a split, and how an interrupted preparation can continue without silently changing the dataset**. Its solution is a pinned source revision, two seeded random streams, a deterministic content-hash split, checksummed shard/buffer snapshots, and a replay check before resuming.

@@ -3,7 +3,7 @@ title: "Assembling the Backbone"
 description: "Follow a token from its embedding through KDA, MLA, AttnRes and MoE, all the way to the next-token scores."
 question: "How do all these pieces become one model that predicts the next token?"
 order: 5
-status: draft
+status: published
 ---
 
 We've spent four chapters taking Kimi K3 apart. We've seen a memory that corrects itself, a way to revisit earlier layers, a small network that reshapes what a token knows, and a collection of experts that doesn't need to wake up all at once.

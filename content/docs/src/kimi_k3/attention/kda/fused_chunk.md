@@ -2,7 +2,7 @@
 title: "FusedKDAChunkwise"
 description: "Wraps the external FLA chunk_kda kernel with this model’s projections, gates, and output contract."
 sourcePath: "src/kimi_k3/attention/kda/fused_chunk.py"
-status: review
+status: published
 ---
 
 `FusedKDAChunkwise` has the same `(B,T,M) → (B,T,M)` attention-branch contract as the reference KDA, but delegates its recurrent/chunkwise computation to **Flash Linear Attention (FLA)**. It is an integration wrapper, not a Triton kernel implemented locally. Its import is made lazily by `build_kda()` so CPU-only model construction can avoid importing FLA.

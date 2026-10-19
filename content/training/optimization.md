@@ -3,7 +3,7 @@ title: "Optimization"
 description: "How a hybrid optimizer, careful parameter geometry and stability checks turn gradients into controlled training updates."
 question: "How do you choose an update rule that remains stable as training grows?"
 order: 3
-status: draft
+status: published
 ---
 
 Imagine two parts of a language model. One is a large matrix that turns a token's representation into a new one. The other is a tiny normalization scale that adjusts the strength of a signal. Both receive gradients. But should we ask them to change in exactly the same way?

@@ -2,7 +2,7 @@
 title: "MixedPrecisionRMSNorm"
 description: "Calls PyTorch RMSNorm with the gain cast to the current input dtype."
 sourcePath: "src/kimi_k3/utils/rmsn.py"
-status: review
+status: published
 ---
 
 `MixedPrecisionRMSNorm` subclasses `torch.nn.RMSNorm`. The change is intentionally narrow: preserve the superclass parameter/state layout while choosing the gain's arithmetic dtype from the tensor entering `forward`. This matters when model parameters remain FP32 but some activations are BF16.

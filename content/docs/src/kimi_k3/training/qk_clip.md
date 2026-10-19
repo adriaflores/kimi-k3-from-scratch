@@ -2,7 +2,7 @@
 title: "QKClip"
 description: "Observes causal MLA QK scores and rescales selected projection rows after successful updates."
 sourcePath: "src/kimi_k3/training/qk_clip.py"
-status: review
+status: published
 ---
 
 `QKClip` implements a training-time intervention for **MLA**, not KDA: it observes the maximum causal attention score per head and, when the configured threshold is exceeded, rescales selected Q/K projection weights. The observer is temporary, and rescaling is performed **after a successful optimizer step**, never as part of ordinary evaluation [source L1–L6](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/qk_clip.py#L1-L6). This file implements neither a different attention forward kernel nor a general gradient clip.

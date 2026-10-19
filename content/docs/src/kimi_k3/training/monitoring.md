@@ -2,7 +2,7 @@
 title: "TrainingMonitor"
 description: "Separates training and session clocks and samples process/CUDA memory at event boundaries."
 sourcePath: "src/kimi_k3/training/monitoring.py"
-status: review
+status: published
 ---
 
 `TrainingMonitor` measures **completed training phases** for a single invocation. It distinguishes active training time from session elapsed time, which also includes evaluation, checkpointing, reporting and profiling [source L13–L18](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/monitoring.py#L13-L18). It is a scalar/event monitor, not a CUDA kernel profiler: see `training/profiling.py` for optional traces.

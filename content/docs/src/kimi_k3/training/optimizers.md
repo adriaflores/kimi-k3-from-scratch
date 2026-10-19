@@ -2,7 +2,7 @@
 title: "MuonAdamW and Newton–Schulz"
 description: "Combines per-matrix Muon updates with native AdamW in one checkpointable optimizer and optional compiled batching."
 sourcePath: "src/kimi_k3/training/optimizers.py"
-status: review
+status: published
 ---
 
 `MuonAdamW` is a **single PyTorch optimizer object** that dispatches explicitly configured parameter groups to two algorithms. Hidden two-dimensional matrices receive Muon; auxiliary tensors receive PyTorch AdamW. Both routes share one optimizer state dictionary and parameter-group schedule [source L134–L169](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/optimizers.py#L134-L169). The module also implements the Newton–Schulz update approximation and optional compiled/batched execution. It does **not** choose which model parameters deserve Muon—that is the responsibility of `training/parameter_groups.py`—or apply QK-Clip, which the trainer calls **after** successful optimizer updates.

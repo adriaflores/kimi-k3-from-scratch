@@ -2,7 +2,7 @@
 title: "ProfileConfig and TrainingProfiler"
 description: "Captures a bounded CPU/CUDA profiling window with temporary module scopes and compressed traces."
 sourcePath: "src/kimi_k3/training/profiling.py"
-status: review
+status: published
 ---
 
 `TrainingProfiler` is an **optional, bounded instrumentation context**, not a continuously active measurement system. Normal training with `config=None` does not construct a Kineto profiler or install module hooks [source L1–L2](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/profiling.py#L1-L2). It is designed to observe a fixed number of *optimizer attempts*, including FP16-overflow skips, while retaining clean model/module state after the window.

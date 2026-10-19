@@ -2,7 +2,7 @@
 title: "build_parameter_groups"
 description: "Assigns model parameters to Muon or AdamW and declares independent matrix views for the optimizer."
 sourcePath: "src/kimi_k3/training/parameter_groups.py"
-status: review
+status: published
 ---
 
 `build_parameter_groups(model, weight_decay)` is the **bridge between model structure and the hybrid optimizer**. It does not update weights. Instead, it visits the modules, records which parameters need special treatment, then assigns each trainable parameter exactly once to a group consumed by `MuonAdamW` [source L20–L33](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/parameter_groups.py#L20-L33). Its structural rules also work with fused FLA-backed KDA, not just the readable implementation.

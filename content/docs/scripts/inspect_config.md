@@ -2,7 +2,7 @@
 title: "inspect_config.py — Model parameter accounting"
 description: "Instantiates a Kimi K3 configuration to report unique total parameters, estimated active parameters and component budgets."
 sourcePath: "scripts/inspect_config.py"
-status: review
+status: published
 ---
 
 [`scripts/inspect_config.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/scripts/inspect_config.py) answers a static architecture-budget question: *how many unique stored parameters does this configured model have, and how many are on the selected-expert path for one token?* It builds the real module graph but performs no forward pass, optimization or data loading. By default, construction occurs on PyTorch's `meta` device so parameter tensors have shapes without allocating their numerical storage. The counted module graph belongs to [model.py](/docs/src/kimi_k3/model/) and [stable_latent_moe.py](/docs/src/kimi_k3/moe/stable_latent_moe/).

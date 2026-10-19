@@ -2,7 +2,7 @@
 title: "Training package export"
 description: "Exposes the unified MuonAdamW optimizer through the training package."
 sourcePath: "src/kimi_k3/training/__init__.py"
-status: review
+status: published
 ---
 
 The package declares its scope in a docstring and performs one explicit re-export [source L1–L2](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/__init__.py#L1-L2):

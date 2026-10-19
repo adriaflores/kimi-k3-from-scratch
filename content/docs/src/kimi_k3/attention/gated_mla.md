@@ -2,7 +2,7 @@
 title: "GatedMLA"
 description: "Implements causal multi-head latent attention with shared key features and optional output gating."
 sourcePath: "src/kimi_k3/attention/gated_mla.py"
-status: review
+status: published
 ---
 
 `GatedMLA` maps `(B,T,M)` hidden states to a new `(B,T,M)` attention contribution. It compresses Q and KV projections before expanding them into head features, appends a **shared** K component across heads, and calls PyTorch's causal scaled-dot-product attention. It is the decoder's MLA branch, not a complete residual block.

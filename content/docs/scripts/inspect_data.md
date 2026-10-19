@@ -2,7 +2,7 @@
 title: "inspect_data.py — Prepared shard inspection"
 description: "Loads one causal token batch and independently checks a boundary between prepared NumPy shards."
 sourcePath: "scripts/inspect_data.py"
-status: review
+status: published
 ---
 
 [`scripts/inspect_data.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/scripts/inspect_data.py) is a read-only inspection command for a prepared token dataset. It does not prepare data, train a model, or verify every token in the corpus. The reusable reader is documented in [dataset.py](/docs/src/kimi_k3/data/dataset/). Instead, it asks two concrete questions: does the first batch obey the next-token shift, and can the reader reconstruct a sequence that crosses from the first shard into the second?

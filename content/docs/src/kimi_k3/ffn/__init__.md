@@ -2,7 +2,7 @@
 title: "FFN package exports"
 description: "Makes DenseFFN and SituGLU available from the feed-forward package."
 sourcePath: "src/kimi_k3/ffn/__init__.py"
-status: review
+status: published
 ---
 
 The module is a single import statement at [source L1–L1](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/ffn/__init__.py#L1-L1):

@@ -2,7 +2,7 @@
 title: "MoE package export"
 description: "Re-exports StableLatentMoE as the package-level mixture-of-experts module."
 sourcePath: "src/kimi_k3/moe/__init__.py"
-status: review
+status: published
 ---
 
 The entire file is [source L1–L1](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/moe/__init__.py#L1-L1):

@@ -2,7 +2,7 @@
 title: "bench_muon.py — Muon optimizer microbenchmark"
 description: "Compares synthetic CUDA optimizer-step modes and checks Newton–Schulz arithmetic across logical parameter layouts."
 sourcePath: "scripts/bench_muon.py"
-status: review
+status: published
 ---
 
 [`scripts/bench_muon.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/scripts/bench_muon.py) is an isolated optimizer benchmark. It uses the **real model's parameter-group geometry**, but replaces every parameter and gradient with seeded synthetic values. It times `MuonAdamW.step()` under two implementation choices and checks the underlying Newton–Schulz arithmetic against the eager reference. There is **no forward pass, backward pass, token processing or end-to-end pretraining throughput measurement**. The numerical routines are documented separately in [optimizers.py](/docs/src/kimi_k3/training/optimizers/) and [parameter_groups.py](/docs/src/kimi_k3/training/parameter_groups/).

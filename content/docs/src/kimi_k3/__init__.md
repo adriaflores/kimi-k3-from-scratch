@@ -2,7 +2,7 @@
 title: "kimi_k3 package"
 description: "The root Python package marker, without imports, exports, or initialization logic."
 sourcePath: "src/kimi_k3/__init__.py"
-status: review
+status: published
 ---
 
 `src/kimi_k3/__init__.py` is deliberately empty at [source L1–L1](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/__init__.py). Importing the `kimi_k3` package executes no package-specific statements and does not automatically re-export `KimiK3`, configuration classes, trainers, or attention layers.

@@ -2,7 +2,7 @@
 title: "ShardedTokenDataset and TokenDataLoader"
 description: "Reads metadata-ordered uint16 shards and provides causal batches with resumable stream offsets."
 sourcePath: "src/kimi_k3/data/dataset.py"
-status: review
+status: published
 ---
 
 This file is the runtime boundary between prepared token storage and model inputs. `ShardedTokenDataset` exposes a flat, metadata-ordered token stream across `.npy` shards. `TokenDataLoader` layers a sequential, non-wrapping batch cursor on that stream. Neither class downloads documents, invokes a tokenizer, builds shards or stores full-dataset tensors on the GPU.

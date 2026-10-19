@@ -2,7 +2,7 @@
 title: "KDARecurrent"
 description: "Implements tokenwise Kimi Delta Attention with featurewise state decay and delta writes."
 sourcePath: "src/kimi_k3/attention/kda/recurrent.py"
-status: review
+status: published
 ---
 
 `KDARecurrent` is the readable, token-by-token Kimi Delta Attention implementation. It maps `(B,T,M)` inputs to an `(B,T,M)` attention contribution, starting a **new zero state on every forward call**. Its recurrence provides the reference against which chunkwise implementations can be checked; it is not the backend selected by the model factory in normal model construction.

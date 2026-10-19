@@ -2,7 +2,7 @@
 title: "MoEDiagnostics"
 description: "Collects per-interval routed-expert assignment counts and QuantileBalancer snapshots without persistent hooks."
 sourcePath: "src/kimi_k3/training/moe_metrics.py"
-status: review
+status: published
 ---
 
 `MoEDiagnostics` exists to answer a narrow operational question: **which routed experts were selected by actual training forwards during this log interval?** It avoids reconstructing choices from router probabilities, and it does not change routing or create checkpoint state [source L1–L13](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/moe_metrics.py#L1-L13). The model's `StableLatentMoE` exposes the temporary `_expert_load_counts` interface that this component activates.

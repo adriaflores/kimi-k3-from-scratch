@@ -2,7 +2,7 @@
 title: "Data package exports"
 description: "Exposes prepared-shard readers without performing dataset preparation or tokenization."
 sourcePath: "src/kimi_k3/data/__init__.py"
-status: review
+status: published
 ---
 
 This package is the entry point for the prepared-token reader. The module docstring expressly limits its responsibility to reading already prepared shards, rather than downloading a corpus or tokenizing text [source L1–L5](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/data/__init__.py#L1-L5).

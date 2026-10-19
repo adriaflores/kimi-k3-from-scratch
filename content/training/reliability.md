@@ -3,7 +3,7 @@ title: "Reliability"
 description: "How checkpoints, recovery checks, and run records turn an interrupted training job into a traceable continuation."
 question: "How do you make a long training run safe to interrupt and trust?"
 order: 2
-status: draft
+status: published
 ---
 
 Imagine a training job disappearing halfway through the night. In the morning, you load the latest weights, restart, and the loss looks reasonable.

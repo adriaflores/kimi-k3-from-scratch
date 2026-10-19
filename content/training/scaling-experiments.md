@@ -3,7 +3,7 @@ title: "Scaling Experiments"
 description: "How controlled, low-cost probes expose memory, throughput and learning-rate risks before a larger Kimi K3 training run."
 question: "What can small experiments tell you before you commit to a big run?"
 order: 4
-status: draft
+status: published
 ---
 
 Imagine booking a GPU for a long training run. A few hours in, you discover that the sequence length barely fits in memory. Or perhaps the model fits perfectly, but each update takes so long that the planned token budget is out of reach. Neither problem requires a long run to discover. You would much rather learn about it in the first few minutes.

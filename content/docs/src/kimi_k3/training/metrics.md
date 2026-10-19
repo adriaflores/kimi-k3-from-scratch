@@ -2,7 +2,7 @@
 title: "MetricsWriter and TrainingWindow"
 description: "Persists append-only JSONL training events and aggregates scalar statistics over logging windows."
 sourcePath: "src/kimi_k3/training/metrics.py"
-status: review
+status: published
 ---
 
 This module provides two deliberately small components: `MetricsWriter` owns disk records for one training session, and `TrainingWindow` accumulates **detached scalar statistics** until the next training log. Neither module executes the model or collects tensor hooks [source L1–L10](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/metrics.py#L1-L10). These are operational records, distinct from independently reviewed Results evidence.

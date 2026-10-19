@@ -2,7 +2,7 @@
 title: "RunContext and start_run"
 description: "Records reproducible run provenance, session identities and resume-compatible run manifests."
 sourcePath: "src/kimi_k3/training/run.py"
-status: review
+status: published
 ---
 
 `start_run(...)` creates or extends a **run manifest**, rather than training a model. It receives an already constructed model, optimizer, effective training configuration and loader state, and returns `RunContext(directory,checkpoint_path,run_id,session_id)` [source L25–L30](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/run.py#L25-L30). An individual run may contain multiple sessions; every resume gets a new session ID while retaining the run ID. The checkpoint's numerical restoration belongs to `trainer.py`, and CLI argument parsing belongs to the training script.

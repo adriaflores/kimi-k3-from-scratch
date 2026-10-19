@@ -2,7 +2,7 @@
 title: "evaluate.py — Exploratory checkpoint evaluation"
 description: "Connects a trainer-format checkpoint to prepared token windows and prints or saves next-token evaluation metrics."
 sourcePath: "scripts/evaluate.py"
-status: review
+status: published
 ---
 
 [`scripts/evaluate.py`](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/scripts/evaluate.py) is the thin, read-only entry point for **exploratory** next-token evaluation. It chooses a prepared split and disjoint windows, loads model weights from a compatible checkpoint, delegates scoring to `evaluate_windows()`, and serializes the result. The script explicitly does **not** reproduce the project's original pre-registered held-out evaluation protocol. Its delegated components have separate Docs references for [evaluation.py](/docs/src/kimi_k3/evaluation/) and [inference.py](/docs/src/kimi_k3/inference/).

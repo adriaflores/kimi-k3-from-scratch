@@ -2,7 +2,7 @@
 title: "load_config"
 description: "Loads a YAML mapping into a dataclass-compatible configuration with exact field-name checking."
 sourcePath: "src/kimi_k3/utils/config.py"
-status: review
+status: published
 ---
 
 `load_config(path, config_cls)` reads a YAML document and constructs the requested configuration class. It is an intentionally strict **field-name gate**, not a generic nested-schema parser or automatic type coercer. Consumers include model and training CLI entry points that pass their dataclass definitions.

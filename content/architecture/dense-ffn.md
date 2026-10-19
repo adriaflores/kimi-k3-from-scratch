@@ -3,7 +3,7 @@ title: "Dense FFN & SiTU-GLU"
 description: "Why attention needs a per-token transformation, and how SiTU-GLU keeps its strongest signals under control."
 question: "Once attention has gathered the information, what actually transforms it?"
 order: 3
-status: draft
+status: published
 ---
 
 Imagine you're trying to understand the word *bank* in a sentence. Attention can bring you clues from nearby words like *river* or *account*. Wonderful. But collecting clues and making sense of them are not quite the same job. At some point, the model needs to take the information it has gathered and **turn it into a more useful representation**.

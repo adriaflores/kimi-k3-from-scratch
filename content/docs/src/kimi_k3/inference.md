@@ -2,7 +2,7 @@
 title: "Checkpoint loading and token generation"
 description: "Provides strict read-only model loading, next-token scoring, and greedy or filtered sampling."
 sourcePath: "src/kimi_k3/inference.py"
-status: review
+status: published
 ---
 
 The functions in `inference.py` operate on trainer-format model checkpoints **without** restoring optimizer state or training cursors. They are not tied to a particular saved model hash and should not be confused with the original pre-registered evaluation pipeline. The central interface is `load_checkpoint_model(...)` followed by `next_token_logits(...)` or `generate_tokens(...)`.

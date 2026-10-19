@@ -3,7 +3,7 @@ title: "Attention Residuals"
 description: "How Kimi K3 lets a layer revisit earlier representations instead of accepting one running sum."
 question: "What if a layer could choose which earlier ideas to bring forward?"
 order: 2
-status: draft
+status: published
 ---
 
 Imagine you're writing an explanation with a friend. You start with a rough idea, improve the wording, add an example, then refine the conclusion. By the time you reach the last paragraph, your draft contains all those changes. But suppose you now want to recover the *original idea*, before the later edits. You can try to reconstruct it from the latest version, or you can go back and read what you wrote earlier.

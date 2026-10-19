@@ -2,7 +2,7 @@
 title: "StableLatentMoE and QuantileBalancer"
 description: "Implements shared and top-k routed expert paths, quantile-based router correction, and grouped expert execution."
 sourcePath: "src/kimi_k3/moe/stable_latent_moe.py"
-status: review
+status: published
 ---
 
 This file defines two cooperating classes: `QuantileBalancer`, which maintains non-gradient routing biases, and `StableLatentMoE`, which computes a shared FFN output plus a routed-expert output in a compressed latent space. The input and output are `(B,T,M)`. Experts are selected using corrected router scores, but contributions are weighted with **uncorrected sigmoid scores**. That distinction is central to reading this forward correctly.

@@ -2,7 +2,7 @@
 title: "TrainConfig, TrainState and training loop"
 description: "Executes single-device causal-LM updates, evaluation, clipped hybrid optimization and resumable checkpointing."
 sourcePath: "src/kimi_k3/training/trainer.py"
-status: review
+status: published
 ---
 
 `trainer.py` is the **execution authority** for one-device Kimi K3 pretraining. It constructs the hybrid optimizer, defines the update schedule, drives model forward/backward passes and coordinates QK-Clip, validation, checkpointing, metrics and bounded profiling [source L1–L23](https://github.com/adriaflores/kimi-k3-from-scratch/blob/10c0dcfa8d2b0415f8866674effd82b7548772e7/src/kimi_k3/training/trainer.py#L1-L23). The input `model(x,targets=y)` must return `(logits, mean_token_loss)`, and each batch starts with no cached attention or recurrent state. This is deliberately distinct from the run-provenance writer (`training/run.py`) and the command-line parser in `scripts/`.

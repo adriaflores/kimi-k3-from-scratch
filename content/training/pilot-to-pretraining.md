@@ -3,7 +3,7 @@ title: "Pilot to Pretraining"
 description: "How a bounded pilot, an unchanged training recipe, and auditable run records determine whether full pretraining is ready to begin."
 question: "When is a pilot convincing enough to launch full pretraining?"
 order: 6
-status: draft
+status: published
 ---
 
 Imagine you're about to start a training run that will occupy a GPU for a long time. The model loads. The first forward pass works. The loss is finite. You could press *start* now, and there's a good chance the machine would stay busy.

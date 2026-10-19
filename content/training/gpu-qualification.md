@@ -3,7 +3,7 @@ title: "GPU Qualification"
 description: "How to decide whether a real GPU, training recipe, and recovery path are ready for a sustained pretraining run."
 question: "How do you know the training system is ready for the target GPU?"
 order: 5
-status: draft
+status: published
 ---
 
 Twenty successful training steps are encouraging. The model ran, the loss was finite, and the GPU did not run out of memory. It is tempting to call that a successful hardware test.
