@@ -2,9 +2,9 @@
 
 An independent PyTorch implementation of the **Kimi K3 language backbone**, built to study how its architecture and training recipe work in practice. The project scales the design down to **294.7M total parameters** (~100.4M active per token) and follows a **~6B-token pretraining run** on FineWeb-Edu.
 
-**[Architecture, training and results — companion website](https://kimi-k3.adriaflores.com)** · **[Research references](references/README.md)** · **[Kimi K3 paper](https://arxiv.org/abs/2607.24653v2)**
+**[Full Documentation — Architecture, Training, Results & Code](https://kimi-k3.adriaflores.com)** · **[Research references](references/README.md)** · **[Kimi K3 paper](https://arxiv.org/abs/2607.24653v2)**
 
-This repository is the **research engineering artifact**: model code, training infrastructure, configurations, experiments and tests. The companion website hosts the longer explanations and visualizations.
+This repository contains the **research engineering artifacts**: model implementations, training infrastructure, configurations, experiments, and tests. The **[project website](https://kimi-k3.adriaflores.com)** serves as the primary documentation hub, with in-depth architectural explanations, training methodology, experimental results, and file-by-file documentation of `src/` and `scripts/`.
 
 ## At a glance
 
