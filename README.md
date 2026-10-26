@@ -2,7 +2,7 @@
 
 An independent PyTorch implementation of the **Kimi K3 language backbone**, built to study how its architecture and training recipe work in practice. The project scales the design down to **294.7M total parameters** (~100.4M active per token) and follows a **~6B-token pretraining run** on FineWeb-Edu.
 
-**[Full Documentation — Architecture, Training, Results & Code](https://kimi-k3.adriaflores.com)** · **[Research references](references/README.md)** · **[Kimi K3 paper](https://arxiv.org/abs/2607.24653v2)**
+**[Full Documentation](https://kimi-k3.adriaflores.com)** · **[Pretrained Weights (Hugging Face)](https://huggingface.co/adriaflores/kimi-k3-300m-from-scratch)** · **[Research References](references/README.md)** · **[Kimi K3 Paper](https://arxiv.org/abs/2607.24653v2)**
 
 This repository contains the **research engineering artifacts**: model implementations, training infrastructure, configurations, experiments, and tests. The **[project website](https://kimi-k3.adriaflores.com)** serves as the primary documentation hub, with in-depth architectural explanations, training methodology, experimental results, and file-by-file documentation of `src/` and `scripts/`.
 
@@ -96,7 +96,22 @@ Checkpoints contain model and optimizer states, training counters, data cursors,
 
 ## Inference and evaluation
 
-The public CLI tools accept compatible **trainer-format v7 checkpoints**. Model weights are **not included** in this repository.
+**Published pretrained model**
+
+The final 294.7M-parameter checkpoint is publicly available on [Hugging Face](https://huggingface.co/adriaflores/kimi-k3-300m-from-scratch). The repository provides a dedicated inference CLI that automatically downloads the weights and tokenizer.
+
+```bash
+uv run --with safetensors python scripts/generate_hf.py \
+  --source adriaflores/kimi-k3-300m-from-scratch \
+  --prompt "The capital of France is" \
+  --max-new-tokens 4
+```
+
+The reference implementation uses CPU, FP32 and chunkwise KDA. The model requires the custom PyTorch implementation and does not currently support direct loading through `AutoModelForCausalLM.from_pretrained()`.
+
+**Local training checkpoints**
+
+The following commands support compatible trainer-format v7 checkpoints for generation and evaluation. Training checkpoints are not included in this repository.
 
 ```bash
 # Generate from a local checkpoint.
@@ -135,7 +150,7 @@ These results describe this specific scaled model and evaluation setup. They are
 
 Qualitative generation demonstrates learned language structure, but also reveals limitations, particularly repetition under greedy decoding. The model is a research pretraining artifact, not an instruction-tuned conversational assistant.
 
-The repository provides the implementation, configurations and evaluation tools. Model weights and full historical training artifacts are not distributed.
+The repository provides the implementation, configurations and evaluation tools. The final pretrained weights are publicly available on **[Hugging Face](https://huggingface.co/adriaflores/kimi-k3-300m-from-scratch)**. The implementation, configurations, and evaluation tools are maintained in this repository. Full historical training artifacts are not distributed.
 
 ## Validation and evidence
 
