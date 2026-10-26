@@ -150,7 +150,7 @@ These results describe this specific scaled model and evaluation setup. They are
 
 Qualitative generation demonstrates learned language structure, but also reveals limitations, particularly repetition under greedy decoding. The model is a research pretraining artifact, not an instruction-tuned conversational assistant.
 
-The repository provides the implementation, configurations and evaluation tools. The final pretrained weights are publicly available on **[Hugging Face](https://huggingface.co/adriaflores/kimi-k3-300m-from-scratch)**. The implementation, configurations, and evaluation tools are maintained in this repository. Full historical training artifacts are not distributed.
+The final pretrained weights are publicly available on **[Hugging Face](https://huggingface.co/adriaflores/kimi-k3-300m-from-scratch)**. The implementation, configurations, and evaluation tools are maintained in this repository. Full historical training artifacts are not distributed.
 
 ## Validation and evidence
 
