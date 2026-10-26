@@ -7,6 +7,12 @@ const root = path.resolve(website, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(website,'src/data/docs-files.json'),'utf8'));
 const docsDir = path.join(root,'content/docs');
 const wanted = new Set(manifest.files.map(x=>x.sourcePath));
+// Release utilities added after the frozen 37-file documentation snapshot.
+// They are documented in the repository README and Hugging Face Model Card.
+const postSnapshotScripts = new Set([
+  'scripts/export_hf.py',
+  'scripts/generate_hf.py',
+]);
 const issues = [];
 const errors = x => issues.push(x);
 const sha = manifest.sourceCommit;
@@ -67,7 +73,17 @@ const scriptsDir=path.join(root,'scripts');
 if(fs.existsSync(srcDir)&&fs.existsSync(scriptsDir)){
  for(const name of walkPy(srcDir)) actual.push(path.relative(root,name).split(path.sep).join('/'));
  for(const name of fs.readdirSync(scriptsDir)) if(name.endsWith('.py')&&fs.statSync(path.join(scriptsDir,name)).isFile()) actual.push(`scripts/${name}`);
- for(const file of actual) if(!wanted.has(file)) errors(`Unexpected source not documented: ${file}`);
+ for (const file of actual) {
+    if (!wanted.has(file) && !postSnapshotScripts.has(file)) {
+      errors(`Unexpected source not documented: ${file}`);
+    }
+  }
+
+  for (const file of postSnapshotScripts) {
+    if (!actual.includes(file)) {
+      errors(`Expected post-snapshot script missing: ${file}`);
+    }
+  }
  for(const file of wanted) if(!actual.includes(file)) errors(`Documented source absent: ${file}`);
 }else console.warn('Source tree absent: offline source-content and inventory check skipped.');
 function walkPy(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walkPy(path.join(dir,e.name)):e.isFile()&&e.name.endsWith('.py')?[path.join(dir,e.name)]:[]);}
